@@ -7,6 +7,7 @@ package sql
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/server/telemetry"
 	"github.com/cockroachdb/cockroach/pkg/sql/catalog/descpb"
@@ -114,6 +115,7 @@ func alterSequenceImpl(
 	}
 	opts := seqDesc.SequenceOpts
 	seqValueKey := params.p.ExecCfg().Codec.SequenceKey(uint32(seqDesc.ID))
+	fmt.Printf("[client] ALTER: %s\n", seqValueKey.String())
 
 	getSequenceValue := func() (int64, error) {
 		kv, err := params.p.txn.Get(params.ctx, seqValueKey)
@@ -122,6 +124,8 @@ func alterSequenceImpl(
 		}
 		return kv.ValueInt(), nil
 	}
+
+	// andrew: this comment
 
 	// Due to the semantics of sequence caching (see sql.planner.incrementSequenceUsingCache()),
 	// it is possible for a sequence to have a value that exceeds its MinValue or MaxValue. Users

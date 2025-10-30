@@ -7,6 +7,7 @@ package batcheval
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/kv/kvpb"
 	"github.com/cockroachdb/cockroach/pkg/kv/kvserver/batcheval/result"
@@ -26,6 +27,7 @@ func Increment(
 	ctx context.Context, readWriter storage.ReadWriter, cArgs CommandArgs, resp kvpb.Response,
 ) (result.Result, error) {
 	args := cArgs.Args.(*kvpb.IncrementRequest)
+	fmt.Printf("[server] IncrementRequest: %#v\n", args.Key)
 	h := cArgs.Header
 	reply := resp.(*kvpb.IncrementResponse)
 

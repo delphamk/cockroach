@@ -159,6 +159,8 @@ func (p *planner) incrementSequenceUsingCache(
 	fetchNextValues := func() (currentValue, incrementAmount, sizeOfCache int64, err error) {
 		seqValueKey := p.ExecCfg().Codec.SequenceKey(uint32(sequenceID))
 
+		fmt.Printf("[client] fetch next: %#v\n", seqValueKey.String())
+
 		// The planner txn is only used if the sequence is accessed in the same
 		// transaction that it was created. Otherwise, we *do not* use the planner
 		// txn here, since nextval does not respect transaction boundaries.
@@ -210,21 +212,15 @@ func (p *planner) incrementSequenceUsingCache(
 
 	var val int64
 	var err error
-	if cacheSize == 1 {
-		val, _, _, err = fetchNextValues()
-		if err != nil {
-			return 0, err
-		}
+
+	// If cache size option is 1 (default -> not cached), and node cache size option is not 0 (not default -> node-cached), then use node-level cache
+	if seqOpts.CacheSize == 1 && seqOpts.NodeCacheSize != 0 {
+		val, err = p.GetSequenceCacheNode().NextValue(sequenceID, uint32(descriptor.GetVersion()), fetchNextValues)
 	} else {
-		// If cache size option is 1 (default -> not cached), and node cache size option is not 0 (not default -> node-cached), then use node-level cache
-		if seqOpts.CacheSize == 1 && seqOpts.NodeCacheSize != 0 {
-			val, err = p.GetSequenceCacheNode().NextValue(sequenceID, uint32(descriptor.GetVersion()), fetchNextValues)
-		} else {
-			val, err = p.GetOrInitSequenceCache().NextValue(uint32(sequenceID), uint32(descriptor.GetVersion()), fetchNextValues)
-		}
-		if err != nil {
-			return 0, err
-		}
+		val, err = p.GetOrInitSequenceCache().NextValue(uint32(sequenceID), uint32(descriptor.GetVersion()), fetchNextValues)
+	}
+	if err != nil {
+		return 0, err
 	}
 	return val, nil
 }

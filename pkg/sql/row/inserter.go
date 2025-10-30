@@ -162,7 +162,7 @@ const (
 
 // InsertRow adds to the batch the kv operations necessary to insert a table row
 // with the given values.
-func (ri *Inserter) InsertRow(
+func (ri *Inserter) InsertRow( // here
 	ctx context.Context,
 	b Putter,
 	values []tree.Datum,

@@ -1409,6 +1409,9 @@ func (ef *execFactory) ConstructInsert(
 	autoCommit bool,
 	vectorInsert bool,
 ) (exec.Node, error) {
+
+	// fmt.Printf(">>>ConstructInsert\n")
+
 	// Derive insert table and column descriptors.
 	rowsNeeded := !returnColOrdSet.Empty()
 	tabDesc := table.(*optTable).desc
@@ -1482,6 +1485,9 @@ func (ef *execFactory) ConstructInsertFastPath(
 	uniqueWithTombstoneIndexes cat.IndexOrdinals,
 	autoCommit bool,
 ) (exec.Node, error) {
+
+	// fmt.Printf(">>> ConstructInsertFastPath\n")
+
 	// Derive insert table and column descriptors.
 	rowsNeeded := !returnColOrdSet.Empty()
 	tabDesc := table.(*optTable).desc

@@ -2315,6 +2315,7 @@ func mvccPutInternal(
 	valueFn func(optionalValue) (roachpb.Value, error),
 	opts MVCCWriteOptions,
 ) (bool, roachpb.LockAcquisition, error) {
+	//andrew2
 	if len(key) == 0 {
 		return false, roachpb.LockAcquisition{}, emptyKeyError()
 	}
@@ -2343,6 +2344,18 @@ func mvccPutInternal(
 	}
 
 	metaKey := MakeMVCCMetadataKey(key)
+	// fmt.Printf("key %v\n", key)
+	// fmt.Printf("metaKey %v\n", metaKey)
+	// keyStr := fmt.Sprintf("%#v", key)
+	// if strings.Contains(keyStr, "SCHEMA CHANGE") {
+	// 	fmt.Printf("sleeping!!!! %v\n", key)
+	// 	time.Sleep(time.Second * 10)
+	// }
+	// if strings.Contains(keyStr, "Trans") {
+	// 	fmt.Printf("sleeping!!!! %v\n", key)
+	// 	time.Sleep(time.Second * 10)
+	// }
+
 	var ok bool
 	var meta *enginepb.MVCCMetadata
 	var origMetaKeySize, origMetaValSize int64
@@ -2878,6 +2891,7 @@ func MVCCIncrement(
 	opts MVCCWriteOptions,
 	inc int64,
 ) (int64, roachpb.LockAcquisition, error) {
+	// fmt.Printf("[server] MVCCIncrement %v\n", key.String()) //andrew1
 	iter, err := newMVCCIterator(
 		ctx, rw, timestamp, false /* rangeKeyMasking */, true, /* noInterleavedIntents */
 		IterOptions{

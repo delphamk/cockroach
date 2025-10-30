@@ -28,10 +28,22 @@ func (sc SequenceCache) NextValue(
 	}
 	cacheEntry := sc[seqID]
 
+	// fmt.Printf("!\n")
+	// fmt.Printf("null?:  %v \n", cacheEntry == nil)
+	// fmt.Printf("entry:  %v \n", cacheEntry)
+	// fmt.Printf("clientVersion: %v\n", clientVersion)
+
+	// if cacheEntry.CurrentValue+cacheEntry.Increment > 33 {
+	// 	return 0, fmt.Errorf("max value reached")
+	// }
+
 	if cacheEntry.NumValues > 0 && cacheEntry.CachedVersion == clientVersion {
 		cacheEntry.CurrentValue += cacheEntry.Increment
 		cacheEntry.NumValues--
-		return cacheEntry.CurrentValue - cacheEntry.Increment, nil
+		// fmt.Printf("using cache\n")
+		return cacheEntry.CurrentValue, nil
+	} else {
+		// fmt.Printf("no cache \n")
 	}
 
 	currentValue, increment, numValues, err := fetchNextValues()
@@ -39,9 +51,11 @@ func (sc SequenceCache) NextValue(
 		return 0, err
 	}
 
+	// fmt.Printf("currentValue:  %v \n", currentValue)
+
 	// One value must be returned, and the rest of the values are stored.
 	val := currentValue
-	cacheEntry.CurrentValue = currentValue + increment
+	cacheEntry.CurrentValue = currentValue
 	cacheEntry.Increment = increment
 	cacheEntry.NumValues = numValues - 1
 	cacheEntry.CachedVersion = clientVersion

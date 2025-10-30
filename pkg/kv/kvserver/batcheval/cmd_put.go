@@ -7,6 +7,8 @@ package batcheval
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cockroachdb/cockroach/pkg/kv/kvpb"
@@ -62,6 +64,11 @@ func Put(
 		MaxLockConflicts:               storage.MaxConflictsPerLockConflictError.Get(&cArgs.EvalCtx.ClusterSettings().SV),
 		TargetLockConflictBytes:        storage.TargetBytesPerLockConflictError.Get(&cArgs.EvalCtx.ClusterSettings().SV),
 		Category:                       fs.BatchEvalReadCategory,
+	}
+
+	keyStr := fmt.Sprintf("%#v", args.Key)
+	if strings.Contains(keyStr, "SCHEMA CHANGE") {
+		fmt.Printf("[server] SCHEMA CHANGE %#v\n", args.Key)
 	}
 
 	var err error
