@@ -36,16 +36,16 @@ func TestCustomMinDistance3d(t *testing.T) {
 	zero_accepted_error := 0.0
 
 	// point
-	// customDist3dTest(t, point0, point1, 1, zero_accepted_error)
-	// customDist3dTest(t, point0, linestring1, 1, zero_accepted_error)
+	customDist3dTest(t, point0, point1, 1, zero_accepted_error)
+	customDist3dTest(t, point0, linestring1, 1, zero_accepted_error)
 	customDist3dTest(t, point0, polygon1, 1.0, zero_accepted_error)
-	// customDist3dTest(t, point0, "POLYGON((-10 -10 1, 10 -10 1, 10 10 1, -10 10 1, -15 5 1, -10 -10 1))", 1.0, zero_accepted_error)
+	customDist3dTest(t, point0, "POLYGON((-10 -10 1, 10 -10 1, 10 10 1, -10 10 1, -15 5 1, -10 -10 1))", 1.0, zero_accepted_error)
 
 	// some random far distance
-	// customDist3dTest(t, "POINT(0 0 0)", "POLYGON((-10 -10 10, 10 -10 10, 10 10 20, -10 10 20, -10 -10 10))", 13.416407864998737, zero_accepted_error)
+	customDist3dTest(t, "POINT(0 0 0)", "POLYGON((-10 -10 10, 10 -10 10, 10 10 20, -10 10 20, -10 -10 10))", 13.416407864998737, zero_accepted_error)
 
 	// point is on the plane but projection is not on poly. It should not be 0
-	// customDist3dTest(t, "POINT(0 100 1)", polygon1, 90, zero_accepted_error)
+	customDist3dTest(t, "POINT(0 100 1)", polygon1, 90, zero_accepted_error)
 
 	//linetype
 	// customDist3dTest(t, linestring0, point1, 1, zero_accepted_error)

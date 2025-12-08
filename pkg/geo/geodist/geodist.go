@@ -307,7 +307,7 @@ func onPointToPolygon3D(c DistanceCalculator, a Point, b Polygon) bool {
 	if !match {
 		/* if the projected point is outside the polygon we search for the closest distance against the boundary
 		 * instead */
-		panic("bad variable")
+		return onPointToPolygon(c, a, b)
 	}
 
 	return c.DistanceUpdater().Update(a, projected)
