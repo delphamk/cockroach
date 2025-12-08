@@ -296,6 +296,7 @@ func Length3D(g geo.Geometry) (float64, error) {
 	case geom.XYZ, geom.XYZM:
 		return length3DFromGeomT(geomRepr)
 	}
+
 	// Call default length
 	return lengthFromGeomT(geomRepr)
 }

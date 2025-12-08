@@ -6,6 +6,7 @@
 package geomfn
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/cockroachdb/cockroach/pkg/geo"
@@ -16,6 +17,7 @@ import (
 	"github.com/cockroachdb/errors"
 	"github.com/twpayne/go-geom"
 	"github.com/twpayne/go-geom/xy/lineintersector"
+	"github.com/twpayne/go-geom/xyz"
 )
 
 // geometricalObjectsOrder allows us to preserve the order of geometrical objects to
@@ -37,7 +39,29 @@ func MinDistance(a geo.Geometry, b geo.Geometry) (float64, error) {
 	if a.SRID() != b.SRID() {
 		return 0, geo.NewMismatchingSRIDsError(a.SpatialObject(), b.SpatialObject())
 	}
-	return minDistanceInternal(a, b, 0, geo.EmptyBehaviorOmit, geo.FnInclusive)
+	_ = geos.HasZ(a.EWKB())
+	return minDistanceInternal(a, b, 0, geo.EmptyBehaviorOmit, geo.FnInclusive, true)
+}
+
+func MinDistance3D(a geo.Geometry, b geo.Geometry) (float64, error) {
+	if a.SRID() != b.SRID() {
+		return 0, geo.NewMismatchingSRIDsError(a.SpatialObject(), b.SpatialObject())
+	}
+	_ = geos.HasZ(a.EWKB())
+	geo.ShapeTypeToLayout(a.ShapeType())
+
+	// a.AsGeomT()
+	// aGeomRepr, err := a.AsGeomT()
+	// if err != nil {
+	// 	return 0, err
+	// }
+
+	// switch geomRepr.Layout() {
+	// case geom.XYZ, geom.XYZM:
+	// 	return length3DFromGeomT(geomRepr)
+	// }
+
+	return minDistanceInternal(a, b, 0, geo.EmptyBehaviorOmit, geo.FnInclusive, false)
 }
 
 // MaxDistance returns the maximum distance across every pair of points comprising
@@ -64,7 +88,7 @@ func DWithin(
 	if !a.CartesianBoundingBox().Buffer(d, d).Intersects(b.CartesianBoundingBox()) {
 		return false, nil
 	}
-	dist, err := minDistanceInternal(a, b, d, geo.EmptyBehaviorError, exclusivity)
+	dist, err := minDistanceInternal(a, b, d, geo.EmptyBehaviorError, exclusivity, true)
 	if err != nil {
 		// In case of any empty geometries return false.
 		if geo.IsEmptyGeometryError(err) {
@@ -108,6 +132,24 @@ func DFullyWithin(
 	return dist <= d, nil
 }
 
+func LongestLineSLocateBetweenElevationstring(a geo.Geometry, from, to float64) (geo.Geometry, error) {
+	// if a.SRID() != b.SRID() {
+	// 	return geo.Geometry{}, geo.NewMismatchingSRIDsError(a.SpatialObject(), b.SpatialObject())
+	// }
+	// u := newGeomMaxDistanceUpdater(math.MaxFloat64, geo.FnInclusive)
+	// return distanceLineStringInternal(a, b, u, geo.EmptyBehaviorOmit)
+
+	fmt.Printf(">>> \n")
+	err := geos.HasZ(a.EWKB())
+
+	// fmt.Printf(">>> type %s \n", a.ShapeType())
+	// fmt.Printf(">>> type %s \n", a.ShapeType2D())
+
+	// fmt.Printf(">>> type %#v \n", a.SpatialObject())
+
+	return a, err
+}
+
 // LongestLineString returns the LineString corresponds to maximum distance across
 // every pair of points comprising geometries A and B.
 func LongestLineString(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
@@ -124,7 +166,7 @@ func ShortestLineString(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
 	if a.SRID() != b.SRID() {
 		return geo.Geometry{}, geo.NewMismatchingSRIDsError(a.SpatialObject(), b.SpatialObject())
 	}
-	u := newGeomMinDistanceUpdater(0 /*stopAfter */, geo.FnInclusive)
+	u := newGeomMinDistanceUpdater(0 /*stopAfter */, geo.FnInclusive, true)
 	return distanceLineStringInternal(a, b, u, geo.EmptyBehaviorOmit)
 }
 
@@ -180,9 +222,12 @@ func minDistanceInternal(
 	stopAfter float64,
 	emptyBehavior geo.EmptyBehavior,
 	exclusivity geo.FnExclusivity,
+	force2D bool,
 ) (float64, error) {
-	u := newGeomMinDistanceUpdater(stopAfter, exclusivity)
-	c := &geomDistanceCalculator{updater: u, boundingBoxIntersects: a.CartesianBoundingBox().Intersects(b.CartesianBoundingBox())}
+
+	u := newGeomMinDistanceUpdater(stopAfter, exclusivity, force2D)
+	bbb := false
+	c := &geomDistanceCalculator{updater: u, boundingBoxIntersects: bbb}
 	return distanceInternal(a, b, c, emptyBehavior)
 }
 
@@ -192,22 +237,21 @@ func minDistanceInternal(
 // EmptyGeometryError if A or B contains only EMPTY geometries, even if emptyBehavior
 // is set to EmptyBehaviorOmit.
 func distanceInternal(
-	a geo.Geometry, b geo.Geometry, c geodist.DistanceCalculator, emptyBehavior geo.EmptyBehavior,
+	aGeo geo.Geometry, bGeo geo.Geometry, distCalc geodist.DistanceCalculator, emptyBehavior geo.EmptyBehavior,
 ) (float64, error) {
 	// If either side has no geoms, then we error out regardless of emptyBehavior.
-	if a.Empty() || b.Empty() {
+	if aGeo.Empty() || bGeo.Empty() {
 		return 0, geo.NewEmptyGeometryError()
 	}
 
-	aGeomT, err := a.AsGeomT()
+	aGeomT, err := aGeo.AsGeomT()
 	if err != nil {
 		return 0, err
 	}
-	bGeomT, err := b.AsGeomT()
+	bGeomT, err := bGeo.AsGeomT()
 	if err != nil {
 		return 0, err
 	}
-
 	// If we early exit, we have to check empty behavior upfront to return
 	// the appropriate error message.
 	// This matches PostGIS's behavior for DWithin, which is always false
@@ -217,47 +261,54 @@ func distanceInternal(
 		return 0, geo.NewEmptyGeometryError()
 	}
 
-	aIt := geo.NewGeomTIterator(aGeomT, emptyBehavior)
-	aGeom, aNext, aErr := aIt.Next()
+	a_GeoIt := geo.NewGeomTIterator(aGeomT, emptyBehavior)
+	aGeom, aNext, aErr := a_GeoIt.Next()
 	if aErr != nil {
 		return 0, aErr
 	}
 	for aNext {
-		aGeodist, err := geomToGeodist(aGeom)
+		a_Geodist, err := geomToGeodist(aGeom)
+
 		if err != nil {
 			return 0, err
 		}
 
-		bIt := geo.NewGeomTIterator(bGeomT, emptyBehavior)
-		bGeom, bNext, bErr := bIt.Next()
+		b_GeoIt := geo.NewGeomTIterator(bGeomT, emptyBehavior)
+		bGeom, bNext, bErr := b_GeoIt.Next()
 		if bErr != nil {
 			return 0, bErr
 		}
 		for bNext {
-			bGeodist, err := geomToGeodist(bGeom)
+			b_Geodist, err := geomToGeodist(bGeom)
 			if err != nil {
 				return 0, err
 			}
-			earlyExit, err := geodist.ShapeDistance(c, aGeodist, bGeodist)
+			// fmt.Printf(">>> a_Geodist %v \n", a_Geodist)
+			// fmt.Printf(">>> b_Geodist %v\n", b_Geodist)
+			earlyExit, err := geodist.ShapeDistance(distCalc, a_Geodist, b_Geodist)
 			if err != nil {
 				return 0, err
 			}
+			// earlyExit = false
 			if earlyExit {
-				return c.DistanceUpdater().Distance(), nil
+				// fmt.Printf(">>> earlyExit %v dist %v\n", earlyExit, distCalc.DistanceUpdater().Distance())
+				return distCalc.DistanceUpdater().Distance(), nil
 			}
 
-			bGeom, bNext, bErr = bIt.Next()
+			bGeom, bNext, bErr = b_GeoIt.Next()
 			if bErr != nil {
 				return 0, bErr
 			}
 		}
 
-		aGeom, aNext, aErr = aIt.Next()
+		aGeom, aNext, aErr = a_GeoIt.Next()
 		if aErr != nil {
 			return 0, aErr
 		}
 	}
-	return c.DistanceUpdater().Distance(), nil
+	// fmt.Printf(">>> FINAL %v\n", distCalc.DistanceUpdater().Distance())
+
+	return distCalc.DistanceUpdater().Distance(), nil
 }
 
 // geomToGeodist converts a given geom object to a geodist shape.
@@ -403,7 +454,9 @@ func (c *geomGeodistEdgeCrosser) ChainCrossing(p geodist.Point) (bool, geodist.P
 type geomMinDistanceUpdater struct {
 	currentValue float64
 	stopAfter    float64
-	exclusivity  geo.FnExclusivity
+	force2D      bool
+
+	exclusivity geo.FnExclusivity
 	// coordA represents the first vertex of the edge that holds the maximum distance.
 	coordA geom.Coord
 	// coordB represents the second vertex of the edge that holds the maximum distance.
@@ -416,12 +469,13 @@ var _ geodist.DistanceUpdater = (*geomMinDistanceUpdater)(nil)
 
 // newGeomMinDistanceUpdater returns a new geomMinDistanceUpdater with the
 // correct arguments set up.
-func newGeomMinDistanceUpdater(
-	stopAfter float64, exclusivity geo.FnExclusivity,
+func newGeomMinDistanceUpdater( // updater
+	stopAfter float64, exclusivity geo.FnExclusivity, ignoreZ bool,
 ) *geomMinDistanceUpdater {
 	return &geomMinDistanceUpdater{
 		currentValue:        math.MaxFloat64,
 		stopAfter:           stopAfter,
+		force2D:             ignoreZ,
 		exclusivity:         exclusivity,
 		coordA:              nil,
 		coordB:              nil,
@@ -435,11 +489,34 @@ func (u *geomMinDistanceUpdater) Distance() float64 {
 }
 
 // Update implements the geodist.DistanceUpdater interface.
-func (u *geomMinDistanceUpdater) Update(aPoint geodist.Point, bPoint geodist.Point) bool {
+func (u *geomMinDistanceUpdater) Update(aPoint geodist.Point, bPoint geodist.Point) bool { // @D
 	a := aPoint.GeomPoint
 	b := bPoint.GeomPoint
 
-	dist := coordNorm(coordSub(a, b))
+	// fmt.Printf(">>> geomMinDistanceUpdater \n")
+	// fmt.Printf(">>> a %#v \n", a)
+	// fmt.Printf(">>> b %#v \n", b)
+	// fmt.Printf(">>> coordSub %#v \n", coordSub(a, b))
+
+	// fmt.Printf(">>> aPoint %#v \n", aPoint.GeomPoint)
+
+	// fmt.Printf(">>> LEN A %v B %v\n", len(a), len(b))
+	var dist float64
+	if len(a) >= 3 && len(b) >= 3 && u.force2D == false {
+
+		dist = xyz.Distance(a, b)
+		// fmt.Printf(">>> 3d DISTANCE!! %v\n", dist)
+		// fmt.Printf(">>> a %v \n", a)
+		// fmt.Printf(">>> b %v \n", b)
+
+	} else {
+		fmt.Printf(">>> 2D CALC DISTANCE! \n")
+
+		dist = coordNorm(coordSub(a, b))
+	}
+
+	// fmt.Printf(">>> zzz dist %v\n", dist)
+
 	if dist < u.currentValue || u.coordA == nil {
 		u.currentValue = dist
 		if u.geometricalObjOrder == geometricalObjectsFlipped {
@@ -563,6 +640,10 @@ type geomDistanceCalculator struct {
 
 var _ geodist.DistanceCalculator = (*geomDistanceCalculator)(nil)
 
+func (g *geomDistanceCalculator) ClosestPointToPolygon(point geodist.Point, poly geodist.Polygon) (geodist.Point, bool) {
+	panic("unimplemetented")
+}
+
 // DistanceUpdater implements geodist.DistanceCalculator.
 func (c *geomDistanceCalculator) DistanceUpdater() geodist.DistanceUpdater {
 	return c.updater
@@ -677,7 +758,10 @@ func findPointSideOfLinearRing(point geodist.Point, linearRing geodist.LinearRin
 func (c *geomDistanceCalculator) PointIntersectsLinearRing(
 	point geodist.Point, linearRing geodist.LinearRing,
 ) bool {
-	switch findPointSideOfLinearRing(point, linearRing) {
+	x := findPointSideOfLinearRing(point, linearRing)
+	fmt.Printf(">>> HERE %v\n", x)
+
+	switch x {
 	case insideLinearRing, onLinearRing:
 		return true
 	default:

@@ -3531,6 +3531,9 @@ The azimuth is angle is referenced from north, and is positive clockwise: North 
 		defProps(),
 		geometryOverload2(
 			func(_ context.Context, _ *eval.Context, a, b *tree.DGeometry) (tree.Datum, error) {
+				fmt.Printf("111>>> geometryOverload2\n")
+
+				_ = geos.HasZ(a.EWKB())
 				ret, err := geomfn.MinDistance(a.Geometry, b.Geometry)
 				if err != nil {
 					if geo.IsEmptyGeometryError(err) {
@@ -3548,6 +3551,8 @@ The azimuth is angle is referenced from north, and is positive clockwise: North 
 		),
 		geographyOverload2(
 			func(_ context.Context, _ *eval.Context, a *tree.DGeography, b *tree.DGeography) (tree.Datum, error) {
+				fmt.Printf("222>>> geographyOverload2\n")
+
 				ret, err := geogfn.Distance(a.Geography, b.Geography, geogfn.UseSpheroid)
 				if err != nil {
 					if geo.IsEmptyGeometryError(err) {
@@ -3572,6 +3577,7 @@ The azimuth is angle is referenced from north, and is positive clockwise: North 
 			},
 			ReturnType: tree.FixedReturnType(types.Float),
 			Fn: func(_ context.Context, _ *eval.Context, args tree.Datums) (tree.Datum, error) {
+				fmt.Printf("333>>> tree.Overload\n")
 				a := tree.MustBeDGeography(args[0])
 				b := tree.MustBeDGeography(args[1])
 				useSpheroid := tree.MustBeDBool(args[2])
@@ -3591,6 +3597,28 @@ The azimuth is angle is referenced from north, and is positive clockwise: North 
 			}.String(),
 			Volatility: volatility.Immutable,
 		},
+	),
+	"st_3ddistance": makeBuiltin(
+		defProps(),
+		geometryOverload2(
+			func(_ context.Context, _ *eval.Context, a, b *tree.DGeometry) (tree.Datum, error) {
+				fmt.Printf("!!!>>> st_3ddistance\n")
+				_ = geos.HasZ(a.EWKB())
+				ret, err := geomfn.MinDistance3D(a.Geometry, b.Geometry)
+				if err != nil {
+					if geo.IsEmptyGeometryError(err) {
+						return tree.DNull, nil
+					}
+					return nil, err
+				}
+				return tree.NewDFloat(tree.DFloat(ret)), nil
+			},
+			types.Float,
+			infoBuilder{
+				info: `Returns the distance between the given geometries.`,
+			},
+			volatility.Immutable,
+		),
 	),
 	"st_distancesphere": makeBuiltin(
 		defProps(),

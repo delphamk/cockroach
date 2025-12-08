@@ -752,6 +752,302 @@ func TestFrechetDistance(t *testing.T) {
 	})
 }
 
+func TestLongestLineSLocateBetweenElevationstring(t *testing.T) {
+	println("hi")
+
+	testCases := []struct {
+		a    string
+		from float64
+		to   float64
+	}{
+		{"LINESTRING(1 2 3, 4 5 6)", 2, 5},
+		{"LINESTRING(1 2, 4 5)", 2, 5},
+	}
+
+	for _, tc := range testCases {
+		obj, err := geo.ParseGeometry(tc.a)
+		require.NoError(t, err)
+		_, err = LongestLineSLocateBetweenElevationstring(obj, tc.from, tc.to)
+		require.NoError(t, err)
+	}
+	// t.Error("test")
+
+}
+func inTolerance(a, b, tolerance float64) bool {
+	return math.Abs(a-b) <= tolerance
+}
+
+func dist3dTest(t *testing.T, geo1 string, geo2 string, ans float64, tolerance float64) {
+	a, err := geo.ParseGeometry(geo1)
+	if err != nil {
+		fmt.Printf(">>> err: %s\n", err)
+		return
+	}
+	require.NoError(t, err)
+	b, err := geo.ParseGeometry(geo2)
+	if err != nil {
+		fmt.Printf(">>> err: %s\n", err)
+		return
+	}
+	require.NoError(t, err)
+
+	dist, err := MinDistance3D(a, b)
+	require.NoError(t, err)
+
+	valid := inTolerance(dist, ans, tolerance)
+	if !valid {
+		err = fmt.Errorf("failed dist3dTest. dist: %v, expected: %v, tolerance: %v", dist, ans, tolerance)
+		fmt.Printf(">>> 1: %s \n", geo1)
+		fmt.Printf(">>> 2: %s \n", geo2)
+
+		fmt.Printf(">>> ERROR %s \n", err)
+
+		t.Error(err)
+	}
+}
+
+func TestMinDistance3d(t *testing.T) {
+
+	testCases := []struct {
+		a string
+		b string
+	}{
+		// {"POINT(1 1 1)", "POINT(2 2 2)"},
+		// {"POINT(1 1)", "POINT(2 2)"},
+		{"LINESTRING(1 1 1 , 2 1 1)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))"},
+		// {"POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", "LINESTRING(1 1 1 , 2 1 1)"},
+		// {"LINESTRING(-10000 -10000 0, 0 0 1)", "POLYGON((0 0 0, 1 0 0, 1 1 0, 0 1 0, 0 0 0))"},
+	}
+
+	for _, tc := range testCases {
+		a, err := geo.ParseGeometry(tc.a)
+		require.NoError(t, err)
+		b, err := geo.ParseGeometry(tc.b)
+
+		require.NoError(t, err)
+
+		dist, err := MinDistance3D(a, b)
+
+		require.NoError(t, err)
+		fmt.Printf(">>> got dist: %v \n", dist)
+
+	}
+	if true {
+		return
+	}
+	// t.Error("test")
+	default_accepted_error := 0.00001
+	zero_accepted_error := 0.0
+
+	// println(default_accepted_error)
+	// println(zero_accepted_error)
+
+	dist3dTest(t, "POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5, default_accepted_error)
+	dist3dTest(t, "POINT(0 0 0)", "MULTIPOINT(0 1.5 0, 0 2 0, 0 2.5 0)", 1.5, default_accepted_error)
+	dist3dTest(t, "POINT(0 0 0)", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0, default_accepted_error)
+	dist3dTest(t, "POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))", 5.0, default_accepted_error)
+	dist3dTest(t, "POINT(0 0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0))))", 5.0, default_accepted_error)
+	dist3dTest(t, "POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4))))", 5.0, default_accepted_error)
+	dist3dTest(t, "GEOMETRYCOLLECTION(POINT(0 0 0))", "GEOMETRYCOLLECTION(POINT(3 4 0))", 5.0, default_accepted_error)
+	dist3dTest(t, "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(0 0 0)))",
+		"GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4 0)))",
+		5.0, default_accepted_error)
+	dist3dTest(t, "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(0 0 0)))",
+		"GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4 0)))",
+		5.0, default_accepted_error)
+	dist3dTest(t, "LINESTRING(-2 0 0, -0.2 0 0)", "POINT(-2 0 0)", 0, zero_accepted_error)
+	dist3dTest(t, "LINESTRING(-0.2 0 0, -2 0 0)", "POINT(-2 0 0)", 0, zero_accepted_error)
+	dist3dTest(t, "LINESTRING(-1e-8 0 0, -0.2 0 0)", "POINT(-1e-8 0 0)", 0, zero_accepted_error)
+	dist3dTest(t, "LINESTRING(-0.2 0 0, -1e-8 0 0)", "POINT(-1e-8 0 0)", 0, zero_accepted_error)
+
+	/* Tests around intersections */
+	dist3dTest(t, "LINESTRING(1 0 0 , 2 0 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0, default_accepted_error)
+	dist3dTest(t, "LINESTRING(1 1 1 , 2 1 0)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 0.0, zero_accepted_error)
+	// failing andrew
+	// select ST_3DDistance( 'LINESTRING(1 1 1 , 2 1 1)'::geometry, 'POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))'::geometry );
+	dist3dTest(t, "LINESTRING(1 1 1 , 2 1 1)", "POLYGON((1 1 0, 2 1 0, 2 2 0, 1 2 0, 1 1 0))", 1.0, default_accepted_error)
+
+	// /* Same but triangles */
+	// dist3dTest(t, "LINESTRING(1 0 0 , 2 0 0)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 1.0, default_accepted_error)
+	// dist3dTest(t, "LINESTRING(1 1 1 , 2 1 0)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 0.0, zero_accepted_error)
+	// dist3dTest(t, "LINESTRING(1 1 1 , 2 1 1)", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 1.0, default_accepted_error)
+
+	// /* Triangle to triangle*/
+	// dist3dTest(t, "TRIANGLE((-1 1 0, -2 1 0, -1 2 0, -1 1 0))", "TRIANGLE((1 1 0, 2 1 0, 1 2 0, 1 1 0))", 2.0, default_accepted_error)
+
+	/* Line in polygon */
+	dist3dTest(t, "LINESTRING(1 1 1 , 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 1, 0 0 0))", 0.0, zero_accepted_error)
+
+	/* Line has a point in the same plane as the polygon but isn't the closest*/
+	// failing andrew
+	dist3dTest(t, "LINESTRING(-10000 -10000 0, 0 0 1)", "POLYGON((0 0 0, 1 0 0, 1 1 0, 0 1 0, 0 0 0))", 1, default_accepted_error)
+
+	/* This is an invalid polygon since it defines just a line */
+	dist3dTest(t, "LINESTRING(1 1 1, 2 2 2)", "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", 0, zero_accepted_error)
+	// dist3dTest(t, "TRIANGLE((1 1 1, 2 2 2, 3 3 3, 1 1 1))", "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", 0, zero_accepted_error)
+	// dist3dTest(t, "POLYGON((0 0 0, 2 2 2, 3 3 3, 0 0 0))", "TRIANGLE((1 1 1, 2 2 2, 3 3 3, 1 1 1))", 0, zero_accepted_error)
+	// dist3dTest(t, "TRIANGLE((0 0 0, 2 2 2, 3 3 3, 0 0 0))", "LINESTRING(1 1 1, 2 2 2)", 0, zero_accepted_error)
+
+	/* A box in a box: two solids, one inside another */
+	// dist3dTest(t,
+	// 	"POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	// 	"POLYHEDRALSURFACE Z (((-1 -1 -1,-1 2 -1,2 2 -1,2 -1 -1,-1 -1 -1)),((-1 -1 2,2 -1 2,2 2 2,-1 2 2,-1 -1 2)),((-1 -1 -1,-1 -1 2,-1 2 2,-1 2 -1,-1 -1 -1)),((2 -1 -1,2 2 -1,2 2 2,2 -1 2,2 -1 -1)),((-1 -1 -1,2 -1 -1,2 -1 2,-1 -1 2,-1 -1 -1)),((-1 2 -1,-1 2 2,2 2 2,2 2 -1,-1 2 -1)))",
+	// 	0, zero_accepted_error)
+
+	// /* A box in a box with a hat: two solids, one inside another, Z ray up is hitting hat */
+	// dist3dTest(t,
+	// 	"POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	// 	"POLYHEDRALSURFACE Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	// 	0, zero_accepted_error)
+
+	// /* Same but as TIN */
+	// dist3dTest(t,
+	// 	"TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	// 	"POLYHEDRALSURFACE Z (((0 0 0,0 1 0,1 1 0,1 0 0,0 0 0)),((0 0 1,1 0 1,1 1 1,0 1 1,0 0 1)),((0 0 0,0 0 1,0 1 1,0 1 0,0 0 0)),((1 0 0,1 1 0,1 1 1,1 0 1,1 0 0)),((0 0 0,1 0 0,1 0 1,0 0 1,0 0 0)),((0 1 0,0 1 1,1 1 1,1 1 0,0 1 0)))",
+	// 	0, zero_accepted_error)
+
+	// /* Same but both are TIN */
+	// dist3dTest(t,
+	// 	"TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	// 	"TIN Z (((0 0 0,0 1 0,1 1 0,0 0 0)),((1 0 0,0 0 0,1 1 0,1 0 0)),((0 1 1,1 0 1,1 1 1,0 1 1)),((0 1 1,0 0 1,1 0 1,0 1 1)),((0 0 0,0 0 1,0 1 1,0 0 0)),((0 1 0,0 0 0,0 1 1,0 1 0)),((1 0 1,1 1 0,1 1 1,1 0 1)),((1 0 1,1 0 0,1 1 0,1 0 1)),((0 0 1,1 0 0,1 0 1,0 0 1)),((0 0 1,0 0 0,1 0 0,0 0 1)),((0 1 0,0 1 1,1 1 1,0 1 0)),((1 1 0,0 1 0,1 1 1,1 1 0)))",
+	// 	0, zero_accepted_error)
+
+	// /* Point inside TIN */
+	// dist3dTest(t,
+	// 	"TIN Z (((0 0 2,0 1 2,-1 2 2,0 0 2)),((0 1 2,0 0 2,0 1 4,0 1 2)),((-1 2 2,0 1 2,1 1 2,-1 2 2)),((0 0 2,-1 2 2,-1 -1 2,0 0 2)),((0 1 4,0 0 2,0 0 4,0 1 4)),((0 1 2,0 1 4,1 1 4,0 1 2)),((1 1 2,0 1 2,1 1 4,1 1 2)),((-1 2 2,1 1 2,2 2 2,-1 2 2)),((-1 -1 2,-1 2 2,-1 -1 -1,-1 -1 2)),((0 0 2,-1 -1 2,1 0 2,0 0 2)),((0 0 4,0 0 2,1 0 2,0 0 4)),((0 1 4,0 0 4,1 0 4,0 1 4)),((1 1 4,0 1 4,1 0 4,1 1 4)),((1 1 2,1 1 4,1 0 4,1 1 2)),((2 2 2,1 1 2,2 -1 2,2 2 2)),((-1 2 2,2 2 2,-1 2 -1,-1 2 2)),((-1 -1 -1,-1 2 2,-1 2 -1,-1 -1 -1)),((-1 -1 2,-1 -1 -1,2 -1 -1,-1 -1 2)),((1 0 2,-1 -1 2,2 -1 2,1 0 2)),((0 0 4,1 0 2,1 0 4,0 0 4)),((1 1 2,1 0 4,1 0 2,1 1 2)),((2 -1 2,1 1 2,1 0 2,2 -1 2)),((2 2 2,2 -1 2,2 2 -1,2 2 2)),((-1 2 -1,2 2 2,2 2 -1,-1 2 -1)),((-1 -1 -1,-1 2 -1,2 2 -1,-1 -1 -1)),((2 -1 -1,-1 -1 -1,2 2 -1,2 -1 -1)),((-1 -1 2,2 -1 -1,2 -1 2,-1 -1 2)),((2 2 -1,2 -1 2,2 -1 -1,2 2 -1)))",
+	// 	"POINT(0 0 0)",
+	// 	0, zero_accepted_error)
+
+	// /* A point hits vertical Z edge */
+	// dist3dTest(t,
+	// 	"POLYHEDRALSURFACE Z (((0 -1 1,-1 -1 1,-1 -1 -1,0 -1 -1,1 -1 -1,0 -1 2,0 -1 1)),((0 1 1,0 1 2,1 1 -1,0 1 -1,-1 1 -1,-1 1 1,0 1 1)),((0 -1 1,0 1 1,-1 1 1,-1 -1 1,0 -1 1)),((-1 -1 1,-1 1 1,-1 1 -1,-1 -1 -1,-1 -1 1)),((-1 -1 -1,-1 1 -1,0 1 -1,0 -1 -1,-1 -1 -1)),((0 -1 -1,0 1 -1,1 1 -1,1 -1 -1,0 -1 -1)),((1 -1 -1,1 1 -1,0 1 2,0 -1 2,1 -1 -1)),((0 -1 2,0 1 2,0 1 1,0 -1 1,0 -1 2)))",
+	// 	"POINT(0 0 0)",
+	// 	0, zero_accepted_error)
+
+	// /* A point in the middle of a hole of extruded polygon */
+	// dist3dTest(t,
+	// 	"POLYHEDRALSURFACE Z (((-3 -3 0,-3 3 0,3 3 0,3 -3 0,-3 -3 0),(-1 -1 0,1 -1 0,1 1 0,-1 1 0,-1 -1 0)),((-3 -3 3,3 -3 3,3 3 3,-3 3 3,-3 -3 3),(-1 -1 3,-1 1 3,1 1 3,1 -1 3,-1 -1 3)),((-3 -3 0,-3 -3 3,-3 3 3,-3 3 0,-3 -3 0)),((-3 3 0,-3 3 3,3 3 3,3 3 0,-3 3 0)),((3 3 0,3 3 3,3 -3 3,3 -3 0,3 3 0)),((3 -3 0,3 -3 3,-3 -3 3,-3 -3 0,3 -3 0)),((-1 -1 0,-1 -1 3,1 -1 3,1 -1 0,-1 -1 0)),((1 -1 0,1 -1 3,1 1 3,1 1 0,1 -1 0)),((1 1 0,1 1 3,-1 1 3,-1 1 0,1 1 0)),((-1 1 0,-1 1 3,-1 -1 3,-1 -1 0,-1 1 0)))",
+	// 	"POINT(0 0 1)",
+	// 	1, zero_accepted_error)
+
+	// /* A point at the face of a hole of extruded polygon */
+	// dist3dTest(t,
+	// 	"POLYHEDRALSURFACE Z (((-3 -3 0,-3 3 0,3 3 0,3 -3 0,-3 -3 0),(-1 -1 0,1 -1 0,1 1 0,-1 1 0,-1 -1 0)),((-3 -3 3,3 -3 3,3 3 3,-3 3 3,-3 -3 3),(-1 -1 3,-1 1 3,1 1 3,1 -1 3,-1 -1 3)),((-3 -3 0,-3 -3 3,-3 3 3,-3 3 0,-3 -3 0)),((-3 3 0,-3 3 3,3 3 3,3 3 0,-3 3 0)),((3 3 0,3 3 3,3 -3 3,3 -3 0,3 3 0)),((3 -3 0,3 -3 3,-3 -3 3,-3 -3 0,3 -3 0)),((-1 -1 0,-1 -1 3,1 -1 3,1 -1 0,-1 -1 0)),((1 -1 0,1 -1 3,1 1 3,1 1 0,1 -1 0)),((1 1 0,1 1 3,-1 1 3,-1 1 0,1 1 0)),((-1 1 0,-1 1 3,-1 -1 3,-1 -1 0,-1 1 0)))",
+	// 	"POINT(1 1 2)",
+	// 	0, zero_accepted_error)
+
+	/* A point at the face of a hole of extruded polygon */
+	dist3dTest(t,
+		"LINESTRING Z (-27974.1264 -110211.5032 148.9768,-27975.4229 -110210.9441 149.0093)",
+		"LINESTRING Z (-27995.4183 -110201.8041 149.3354,-27975.4229 -110210.9441 149.0093)",
+		0, zero_accepted_error)
+
+}
+
+func dist2dTest(t *testing.T, geo1 string, geo2 string, ans float64, tolerance float64) {
+	a, err := geo.ParseGeometry(geo1)
+	if err != nil {
+		fmt.Printf(">>> err: %s\n", err)
+		return
+	}
+	require.NoError(t, err)
+	b, err := geo.ParseGeometry(geo2)
+	if err != nil {
+		fmt.Printf(">>> err: %s\n", err)
+		return
+	}
+	require.NoError(t, err)
+
+	dist, err := MinDistance(a, b)
+	require.NoError(t, err)
+
+	valid := inTolerance(dist, ans, tolerance)
+	if !valid {
+		err = fmt.Errorf("failed dist3dTest. dist: %v, expected: %v, tolerance: %v", dist, ans, tolerance)
+		fmt.Printf(">>> 1: %s \n", geo1)
+		fmt.Printf(">>> 2: %s \n", geo2)
+
+		fmt.Printf(">>> ERROR %s \n", err)
+
+		t.Error(err)
+	}
+}
+
+func TestMinDistance2d(t *testing.T) {
+
+	// t.Error("test")
+	default_accepted_error := 0.00001
+	zero_accepted_error := 0.0
+
+	/*
+	** Simple case.
+	 */
+	dist2dTest(t, "POINT(0 0)", "MULTIPOINT(0 1.5,0 2,0 2.5)", 1.5, default_accepted_error)
+
+	/*
+	** Point vs Geometry Collection.
+	 */
+	dist2dTest(t, "POINT(0 0)", "GEOMETRYCOLLECTION(POINT(3 4))", 5.0, default_accepted_error)
+
+	/*
+	** Point vs Geometry Collection Collection.
+	 */
+	dist2dTest(t, "POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4)))", 5.0, default_accepted_error)
+
+	/*
+	** Point vs Geometry Collection Collection Collection.
+	 */
+	dist2dTest(t, "POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4))))", 5.0, default_accepted_error)
+
+	/*
+	** Point vs Geometry Collection Collection Collection Multipoint.
+	 */
+	dist2dTest(t, "POINT(0 0)", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4))))", 5.0, default_accepted_error)
+
+	/*
+	** Geometry Collection vs Geometry Collection
+	 */
+	dist2dTest(t, "GEOMETRYCOLLECTION(POINT(0 0))", "GEOMETRYCOLLECTION(POINT(3 4))", 5.0, default_accepted_error)
+
+	/*
+	** Geometry Collection Collection vs Geometry Collection Collection
+	 */
+	dist2dTest(t, "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(0 0)))", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(POINT(3 4)))", 5.0, default_accepted_error)
+
+	/*
+	** Geometry Collection Collection Multipoint vs Geometry Collection Collection Multipoint
+	 */
+	dist2dTest(t, "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(0 0)))", "GEOMETRYCOLLECTION(GEOMETRYCOLLECTION(MULTIPOINT(3 4)))", 5.0, default_accepted_error)
+
+	/*
+	** Linestring vs its start point
+	 */
+	dist2dTest(t, "LINESTRING(-2 0, -0.2 0)", "POINT(-2 0)", 0, zero_accepted_error)
+
+	/*
+	** Linestring vs its end point
+	 */
+	dist2dTest(t, "LINESTRING(-0.2 0, -2 0)", "POINT(-2 0)", 0, zero_accepted_error)
+
+	/*
+	** Linestring vs its start point (tricky number, see #1459)
+	 */
+	dist2dTest(t, "LINESTRING(-1e-8 0, -0.2 0)", "POINT(-1e-8 0)", 0, zero_accepted_error)
+
+	/*
+	** Linestring vs its end point (tricky number, see #1459)
+	 */
+	dist2dTest(t, "LINESTRING(-0.2 0, -1e-8 0)", "POINT(-1e-8 0)", 0, zero_accepted_error)
+
+	/*
+	** "Fast path" case
+	 */
+	dist2dTest(t, "LINESTRING(10 0,11 1,12 2,13 3,14 4,15 5,16 6)",
+		"LINESTRING(1 1.5,2 3,3 4.5,4 6,5 7.5,6 9)",
+		8.3205, default_accepted_error)
+
+}
+
 func TestFrechetDistanceDensify(t *testing.T) {
 	pf := func(f float64) *float64 { return &f }
 

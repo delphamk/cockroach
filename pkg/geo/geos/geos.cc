@@ -1416,6 +1416,14 @@ CR_GEOS_Status CR_GEOS_RelatePattern(CR_GEOS* lib, CR_GEOS_Slice a, CR_GEOS_Slic
   return toGEOSString(error.data(), error.length());
 }
 
+char CR_GEOS_HasZ(CR_GEOS* lib, CR_GEOS_Slice a) {
+  std::string error;
+  auto handle = initHandleWithErrorBuffer(lib, &error);
+  auto geomG = CR_GEOS_GeometryFromSlice(lib, handle, a);
+  auto hasZ = lib->GEOSHasZ_r(handle, geomG);
+   return hasZ;
+}
+
 CR_GEOS_Status CR_GEOS_SharedPaths(CR_GEOS* lib, CR_GEOS_Slice a, CR_GEOS_Slice b,
                                    CR_GEOS_String* ret) {
   std::string error;

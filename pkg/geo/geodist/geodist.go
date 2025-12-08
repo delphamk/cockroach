@@ -7,6 +7,8 @@
 package geodist
 
 import (
+	"fmt"
+
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
 	"github.com/golang/geo/s2"
@@ -118,6 +120,7 @@ type DistanceCalculator interface {
 	// ClosestPointToEdge returns the closest point to the infinite line denoted by
 	// the edge, and a bool on whether this point lies on the edge segment.
 	ClosestPointToEdge(edge Edge, point Point) (Point, bool)
+	ClosestPointToPolygon(point Point, poly Polygon) (Point, bool)
 	// BoundingBoxIntersects returns whether the bounding boxes of the shapes in
 	// question intersect.
 	BoundingBoxIntersects() bool
@@ -126,52 +129,105 @@ type DistanceCalculator interface {
 // ShapeDistance returns the distance between two given shapes.
 // Distance is defined by the DistanceUpdater provided by the interface.
 // It returns whether the function above should return early.
-func ShapeDistance(c DistanceCalculator, a Shape, b Shape) (bool, error) {
-	switch a := a.(type) {
+func ShapeDistance(distCalc DistanceCalculator, aShape Shape, bShape Shape) (bool, error) {
+	switch a := aShape.(type) {
 	case *Point:
-		switch b := b.(type) {
+		switch b := bShape.(type) {
 		case *Point:
-			return c.DistanceUpdater().Update(*a, *b), nil
+			// fmt.Printf(">>> A and B both points \n")
+
+			return distCalc.DistanceUpdater().Update(*a, *b), nil
 		case LineString:
-			return onPointToLineString(c, *a, b), nil
+			return onPointToLineString(distCalc, *a, b), nil
 		case Polygon:
-			return onPointToPolygon(c, *a, b), nil
+			return onPointToPolygon(distCalc, *a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
 	case LineString:
-		switch b := b.(type) {
+		switch b := bShape.(type) {
 		case *Point:
-			c.DistanceUpdater().FlipGeometries()
+			distCalc.DistanceUpdater().FlipGeometries()
 			// defer to restore the order of geometries at the end of the function call.
-			defer c.DistanceUpdater().FlipGeometries()
-			return onPointToLineString(c, *b, a), nil
+			defer distCalc.DistanceUpdater().FlipGeometries()
+			return onPointToLineString(distCalc, *b, a), nil
 		case LineString:
-			return onShapeEdgesToShapeEdges(c, a, b), nil
+			return onShapeEdgesToShapeEdges(distCalc, a, b), nil
 		case Polygon:
-			return onLineStringToPolygon(c, a, b), nil
+			fmt.Printf(">>> LINE TO POLYGON \n")
+
+			return onLineStringToPolygon(distCalc, a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
 	case Polygon:
-		switch b := b.(type) {
+		switch b := bShape.(type) {
 		case *Point:
-			c.DistanceUpdater().FlipGeometries()
+			distCalc.DistanceUpdater().FlipGeometries()
 			// defer to restore the order of geometries at the end of the function call.
-			defer c.DistanceUpdater().FlipGeometries()
-			return onPointToPolygon(c, *b, a), nil
+			defer distCalc.DistanceUpdater().FlipGeometries()
+			return onPointToPolygon(distCalc, *b, a), nil
 		case LineString:
-			c.DistanceUpdater().FlipGeometries()
+			distCalc.DistanceUpdater().FlipGeometries()
 			// defer to restore the order of geometries at the end of the function call.
-			defer c.DistanceUpdater().FlipGeometries()
-			return onLineStringToPolygon(c, b, a), nil
+			defer distCalc.DistanceUpdater().FlipGeometries()
+			return onLineStringToPolygon(distCalc, b, a), nil
 		case Polygon:
-			return onPolygonToPolygon(c, a, b), nil
+			return onPolygonToPolygon(distCalc, a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
 	}
-	return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", a)
+	return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", aShape)
+}
+func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (bool, error) {
+	switch a := aShape.(type) {
+	case *Point:
+		switch b := bShape.(type) {
+		case *Point:
+			return distCalc.DistanceUpdater().Update(*a, *b), nil
+		case LineString:
+			return onPointToLineString(distCalc, *a, b), nil
+		case Polygon:
+			return onPointToPolygon3D(distCalc, *a, b), nil
+		default:
+			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
+		}
+		// case LineString:
+		// 	switch b := bShape.(type) {
+		// 	case *Point:
+		// 		distCalc.DistanceUpdater().FlipGeometries()
+		// 		// defer to restore the order of geometries at the end of the function call.
+		// 		defer distCalc.DistanceUpdater().FlipGeometries()
+		// 		return onPointToLineString(distCalc, *b, a), nil
+		// 	case LineString:
+		// 		return onShapeEdgesToShapeEdges(distCalc, a, b), nil
+		// 	case Polygon:
+		// 		fmt.Printf(">>> LINE TO POLYGON \n")
+
+		// 		return onLineStringToPolygon(distCalc, a, b), nil
+		// 	default:
+		// 		return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
+		// 	}
+		// case Polygon:
+		// 	switch b := bShape.(type) {
+		// 	case *Point:
+		// 		distCalc.DistanceUpdater().FlipGeometries()
+		// 		// defer to restore the order of geometries at the end of the function call.
+		// 		defer distCalc.DistanceUpdater().FlipGeometries()
+		// 		return onPointToPolygon(distCalc, *b, a), nil
+		// 	case LineString:
+		// 		distCalc.DistanceUpdater().FlipGeometries()
+		// 		// defer to restore the order of geometries at the end of the function call.
+		// 		defer distCalc.DistanceUpdater().FlipGeometries()
+		// 		return onLineStringToPolygon(distCalc, b, a), nil
+		// 	case Polygon:
+		// 		return onPolygonToPolygon(distCalc, a, b), nil
+		// 	default:
+		// 		return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
+		// 	}
+	}
+	return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", aShape)
 }
 
 // onPointToEdgesExceptFirstEdgeStart updates the distance against the edges of a shape and a point.
@@ -228,6 +284,7 @@ func onPointToPolygon(c DistanceCalculator, a Point, b Polygon) bool {
 	//   the exterior ring.
 	// BoundingBoxIntersects: if the bounding box of the shape being calculated does not intersect,
 	//   then we only need to compare the outer loop.
+
 	if c.DistanceUpdater().IsMaxDistance() || !c.BoundingBoxIntersects() ||
 		!c.PointIntersectsLinearRing(a, b.LinearRing(0)) {
 		return onPointToEdgesExceptFirstEdgeStart(c, a, b.LinearRing(0))
@@ -245,12 +302,28 @@ func onPointToPolygon(c DistanceCalculator, a Point, b Polygon) bool {
 	return c.DistanceUpdater().OnIntersects(a)
 }
 
+func onPointToPolygon3D(c DistanceCalculator, a Point, b Polygon) bool {
+	projected, match := c.ClosestPointToPolygon(a, b)
+	if !match {
+		/* if the projected point is outside the polygon we search for the closest distance against the boundary
+		 * instead */
+		panic("bad variable")
+	}
+
+	return c.DistanceUpdater().Update(a, projected)
+}
+
 // onShapeEdgesToShapeEdges updates the distance between two shapes by
 // only looking at the edges.
 // Returns true if the calling function should early exit.
 func onShapeEdgesToShapeEdges(c DistanceCalculator, a shapeWithEdges, b shapeWithEdges) bool {
+	fmt.Printf(">>> a.NumEdges() %v \n", a.NumEdges())
+	fmt.Printf(">>> b.NumEdges() %v \n", b.NumEdges())
+
 	for aEdgeIdx, aNumEdges := 0, a.NumEdges(); aEdgeIdx < aNumEdges; aEdgeIdx++ {
+
 		aEdge := a.Edge(aEdgeIdx)
+
 		var crosser EdgeCrosser
 		// MaxDistance: the max distance between 2 edges is the maximum of the distance across
 		//   pairs of vertices chosen from each edge.
@@ -263,6 +336,8 @@ func onShapeEdgesToShapeEdges(c DistanceCalculator, a shapeWithEdges, b shapeWit
 		for bEdgeIdx, bNumEdges := 0, b.NumEdges(); bEdgeIdx < bNumEdges; bEdgeIdx++ {
 			bEdge := b.Edge(bEdgeIdx)
 			if crosser != nil {
+				fmt.Printf(">>> crosser is not null \n")
+
 				// If the edges cross, the distance is 0.
 				intersects, intersectionPoint := crosser.ChainCrossing(bEdge.V1)
 				if intersects {
@@ -312,7 +387,7 @@ func projectVertexToEdge(c DistanceCalculator, vertex Point, edge Edge) bool {
 
 // onLineStringToPolygon updates the distance between a polyline and a polygon.
 // Returns true if the calling function should early exit.
-func onLineStringToPolygon(c DistanceCalculator, a LineString, b Polygon) bool {
+func onLineStringToPolygon(c DistanceCalculator, line LineString, poly Polygon) bool {
 	// MinDistance: If we know at least one point is outside the exterior ring, then there are two cases:
 	//   * the line is always outside the exterior ring. We only need to compare the line
 	//     against the exterior ring.
@@ -325,11 +400,27 @@ func onLineStringToPolygon(c DistanceCalculator, a LineString, b Polygon) bool {
 	//   check each point in the LineString.
 	// BoundingBoxIntersects: if the bounding box of the two shapes do not intersect,
 	//   then the distance is always from the LineString to the exterior ring.
+	fmt.Printf(">>> CHECK %v \n", c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)))
+	// fmt.Printf(">>> line.Vertex(0) %v \n", line.Vertex(0))
+	// fmt.Printf(">>> poly.LinearRing(0) %#v \n", poly.LinearRing(0))
+
+	// fmt.Printf(">>> 1 %v\n", c.DistanceUpdater().IsMaxDistance())
+	// fmt.Printf(">>> 2 %v\n", !c.BoundingBoxIntersects())
+	// fmt.Printf(">>> 3 %v\n", !c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)))
+
 	if c.DistanceUpdater().IsMaxDistance() ||
 		!c.BoundingBoxIntersects() ||
-		!c.PointIntersectsLinearRing(a.Vertex(0), b.LinearRing(0)) {
-		return onShapeEdgesToShapeEdges(c, a, b.LinearRing(0))
+		!c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)) {
+		fmt.Printf(">>> 11111111 \n")
+
+		return onShapeEdgesToShapeEdges(c, line, poly.LinearRing(0))
 	}
+
+	fmt.Printf(">>> 22222222 \n")
+	fmt.Printf(">>> poly.NumLinearRings() %v \n", poly.NumLinearRings())
+	// if true {
+	// 	return onShapeEdgesToShapeEdges(c, line, poly.LinearRing(0))
+	// }
 
 	// Now we are guaranteed that there is at least one point inside the exterior ring.
 	//
@@ -343,21 +434,23 @@ func onLineStringToPolygon(c DistanceCalculator, a LineString, b Polygon) bool {
 	// * If polyline A does not intersect the hole but there is at least one point inside
 	//   the hole, must be inside that hole and so the distance of this polyline to this hole
 	//   is the distance of this polyline to this polygon.
-	for ringIdx := 1; ringIdx < b.NumLinearRings(); ringIdx++ {
-		hole := b.LinearRing(ringIdx)
-		if onShapeEdgesToShapeEdges(c, a, hole) {
+	for ringIdx := 1; ringIdx < poly.NumLinearRings(); ringIdx++ {
+		hole := poly.LinearRing(ringIdx)
+		if onShapeEdgesToShapeEdges(c, line, hole) {
 			return true
 		}
-		for pointIdx := 0; pointIdx < a.NumVertexes(); pointIdx++ {
-			if c.PointIntersectsLinearRing(a.Vertex(pointIdx), hole) {
+		for pointIdx := 0; pointIdx < line.NumVertexes(); pointIdx++ {
+			if c.PointIntersectsLinearRing(line.Vertex(pointIdx), hole) {
 				return false
 			}
 		}
 	}
 
+	fmt.Printf(">>> 3333333 \n")
+
 	// This means we are inside the exterior ring, and no points are inside a hole.
 	// This means the point is inside the polygon.
-	return c.DistanceUpdater().OnIntersects(a.Vertex(0))
+	return c.DistanceUpdater().OnIntersects(line.Vertex(0))
 }
 
 // onPolygonToPolygon updates the distance between two polygons.

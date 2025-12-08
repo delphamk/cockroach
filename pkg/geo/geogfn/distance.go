@@ -335,6 +335,11 @@ type geographyDistanceCalculator struct {
 	boundingBoxIntersects bool
 }
 
+// ClosestPointToPolygon implements geodist.DistanceCalculator.
+func (c *geographyDistanceCalculator) ClosestPointToPolygon(point geodist.Point, poly geodist.Polygon) (geodist.Point, bool) {
+	panic("unimplemented")
+}
+
 var _ geodist.DistanceCalculator = (*geographyDistanceCalculator)(nil)
 
 // DistanceUpdater implements geodist.DistanceCalculator.

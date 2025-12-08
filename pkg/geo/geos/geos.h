@@ -124,6 +124,9 @@ CR_GEOS_Status CR_GEOS_SymDifference(CR_GEOS* lib, CR_GEOS_Slice a, CR_GEOS_Slic
                                      CR_GEOS_String* symdifferenceEWKB);
 CR_GEOS_Status CR_GEOS_SharedPaths(CR_GEOS* lib, CR_GEOS_Slice a, CR_GEOS_Slice b,
                                    CR_GEOS_String* ret);
+
+char CR_GEOS_HasZ(CR_GEOS* lib, CR_GEOS_Slice a);
+
 CR_GEOS_Status CR_GEOS_Node(CR_GEOS* lib, CR_GEOS_Slice a, CR_GEOS_String* ret);
 
 CR_GEOS_Status CR_GEOS_MinimumBoundingCircle(CR_GEOS* lib, CR_GEOS_Slice a, double* radius,

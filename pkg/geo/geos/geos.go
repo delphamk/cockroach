@@ -1059,6 +1059,30 @@ func SharedPaths(a geopb.EWKB, b geopb.EWKB) (geopb.EWKB, error) {
 	return cStringToSafeGoBytes(cEWKB), nil
 }
 
+func HasZ(a geopb.EWKB) error {
+
+	// g, err := ensureInitInternal()
+	// if err != nil {
+	// 	fmt.Printf(">>> err %v\n", err)
+	// 	return err
+	// }
+
+	// c := C.CR_GEOS_HasZ(g, goToCSlice(a))
+	// fmt.Printf(">>> has z: %v\n", c)
+	return nil
+	// g, err := ensureInitInternal()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// var cEWKB C.CR_GEOS_String
+	// if err := statusToError(
+	// 	C.CR_GEOS_SharedPaths(g, goToCSlice(a), goToCSlice(b), &cEWKB),
+	// ); err != nil {
+	// 	return nil, err
+	// }
+	// return cStringToSafeGoBytes(cEWKB), nil
+}
+
 // Node returns a EWKB containing a set of linestrings using the least possible number of nodes while preserving all of the input ones.
 func Node(a geopb.EWKB) (geopb.EWKB, error) {
 	g, err := ensureInitInternal()
