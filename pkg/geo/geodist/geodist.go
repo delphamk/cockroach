@@ -193,22 +193,22 @@ func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (b
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
-		// case LineString:
-		// 	switch b := bShape.(type) {
-		// 	case *Point:
-		// 		distCalc.DistanceUpdater().FlipGeometries()
-		// 		// defer to restore the order of geometries at the end of the function call.
-		// 		defer distCalc.DistanceUpdater().FlipGeometries()
-		// 		return onPointToLineString(distCalc, *b, a), nil
-		// 	case LineString:
-		// 		return onShapeEdgesToShapeEdges(distCalc, a, b), nil
-		// 	case Polygon:
-		// 		fmt.Printf(">>> LINE TO POLYGON \n")
+	case LineString:
+		switch b := bShape.(type) {
+		case *Point:
+			distCalc.DistanceUpdater().FlipGeometries()
+			// defer to restore the order of geometries at the end of the function call.
+			defer distCalc.DistanceUpdater().FlipGeometries()
+			return onPointToLineString(distCalc, *b, a), nil
+		case LineString:
+			return onShapeEdgesToShapeEdges(distCalc, a, b), nil
+		// case Polygon:
+		// 	fmt.Printf(">>> LINE TO POLYGON \n")
 
-		// 		return onLineStringToPolygon(distCalc, a, b), nil
-		// 	default:
-		// 		return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
-		// 	}
+		// 	return onLineStringToPolygon(distCalc, a, b), nil
+		default:
+			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
+		}
 		// case Polygon:
 		// 	switch b := bShape.(type) {
 		// 	case *Point:

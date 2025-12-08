@@ -48,8 +48,8 @@ func TestCustomMinDistance3d(t *testing.T) {
 	customDist3dTest(t, "POINT(0 100 1)", polygon1, 90, zero_accepted_error)
 
 	//linetype
-	// customDist3dTest(t, linestring0, point1, 1, zero_accepted_error)
-	// customDist3dTest(t, linestring0, linestring1, 1, zero_accepted_error)
+	customDist3dTest(t, linestring0, point1, 1, zero_accepted_error)
+	customDist3dTest(t, linestring0, linestring1, 1, zero_accepted_error)
 	// customDist3dTest(t, linestring0, polygon1, 1.0, zero_accepted_error)
 
 	//polygon
