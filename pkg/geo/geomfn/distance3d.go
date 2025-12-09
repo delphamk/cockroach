@@ -40,7 +40,10 @@ func min3DDistanceInternal(
 ) (float64, error) {
 
 	u := newGeomMin3DDistanceUpdater(stopAfter, exclusivity)
-	c := &geom3DDistanceCalculator{updater: u, boundingBoxIntersects: false}
+
+	bbb := a.CartesianBoundingBox().Intersects(b.CartesianBoundingBox())
+	bbb = false
+	c := &geom3DDistanceCalculator{updater: u, boundingBoxIntersects: bbb}
 	return distanceInternal3D(a, b, c, emptyBehavior)
 }
 
@@ -83,9 +86,9 @@ func (g *geom3DDistanceCalculator) ClosestPointToPolygon(point geodist.Point, po
 // ClosestPointToEdge implements geodist.DistanceCalculator.
 func (c *geom3DDistanceCalculator) ClosestPointToEdge(e geodist.Edge, p geodist.Point) (geodist.Point, bool) {
 
-	fmt.Printf("!!! p %v \n", p.GeomPoint)
-	fmt.Printf("!!! e.V0 %v \n", e.V0.GeomPoint)
-	fmt.Printf("!!! e.V1 %v \n", e.V1.GeomPoint)
+	// fmt.Printf("!!! p %v \n", p.GeomPoint)
+	// fmt.Printf("!!! e.V0 %v \n", e.V0.GeomPoint)
+	// fmt.Printf("!!! e.V1 %v \n", e.V1.GeomPoint)
 
 	if coordEqual3D(e.V0.GeomPoint, e.V1.GeomPoint) {
 		return e.V0, coordEqual3D(e.V0.GeomPoint, p.GeomPoint)
@@ -110,7 +113,7 @@ func (c *geom3DDistanceCalculator) ClosestPointToEdge(e geodist.Edge, p geodist.
 	mul := coordMul3D(ab, r)
 	res := coordAdd3D(e.V0.GeomPoint, mul)
 
-	return geodist.Point{GeomPoint: res}, true
+	return geodist.Point{GeomPoint: res}, c.DistanceUpdater().Update(p, geodist.Point{GeomPoint: res})
 }
 
 // DistanceUpdater implements geodist.DistanceCalculator.
@@ -186,9 +189,9 @@ func (u *geomMin3DDistanceUpdater) Update(aPoint geodist.Point, bPoint geodist.P
 	} else {
 		panic("3d distance update in 2d")
 	}
-	fmt.Printf(">>> a %v \n", a)
-	fmt.Printf(">>> b %v \n", b)
-	fmt.Printf(">>> dist %v\n", dist)
+	// fmt.Printf(">>> a %v \n", a)
+	// fmt.Printf(">>> b %v \n", b)
+	// fmt.Printf(">>> dist %v\n", dist)
 
 	if dist < u.currentValue || u.coordA == nil {
 		u.currentValue = dist
@@ -211,7 +214,6 @@ func (u *geomMin3DDistanceUpdater) Update(aPoint geodist.Point, bPoint geodist.P
 // linear ring.
 func findPointSideOfLinearRing3D(point geodist.Point, linearRing geodist.LinearRing) linearRingSide {
 
-	fmt.Printf(">>>  findPointSideOfLinearRing3D [point %v linearRing %v]\n", point, linearRing)
 
 	// panic("this is used only on to Polygon")
 	windingNumber := 0
@@ -395,7 +397,6 @@ func ProjectPointOnPlan(point geodist.Point, pop geodist.Point, pv geodist.Point
 	mul := coordMul3D(pv.GeomPoint, f)
 
 	projectedPoint := coordAdd3D(point.GeomPoint, mul)
-
 	fmt.Printf(">>>  projectedPoint %v\n", projectedPoint)
 
 	return geodist.Point{GeomPoint: projectedPoint}
@@ -414,8 +415,6 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 	if (pv[2] >= pv.X()) && pv[2] >= pv.Y() {
 		// If the z vector of the normal vector to the plane is larger than x and y vector we project the ring to the xy-plane
 
-		fmt.Printf(">>> 111111111111111 \n")
-
 		for i := 1; i < linering.NumVertexes(); i++ {
 
 			v2 := linering.Vertex(i).GeomPoint
@@ -423,14 +422,12 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 			if (v1.Y() <= p.Y() && v2.Y() > p.Y()) /* an upward crossing */ ||
 				(v1.Y() > p.Y() && v2.Y() <= p.Y() /* a downward crossing */) {
 
-				fmt.Printf(">>> !!!! %v  %v  \n", v1, v2)
 
 				vt := (p.Y() - v1.Y()) / (v2.Y() - v1.Y())
 
 				/* P.x <intersect */
 				val := v1.X() + vt*(v2.X()-v1.X())
 				if p.X() < val {
-					fmt.Printf(">>> ??? [%v]  [%v]   %v  %v  \n", vt, val, v1, v2)
 
 					/* a valid crossing of y=p.y right of p.x */
 					cn++
@@ -439,8 +436,6 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 			v1 = v2
 		}
 	} else if (pv.Y() >= pv.X()) && pv.Y() >= pv[2] {
-
-		fmt.Printf(">>> 22222222222222222222222 \n")
 
 		for i := 1; i < linering.NumVertexes(); i++ {
 			v2 := linering.Vertex(i).GeomPoint
@@ -459,8 +454,6 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 		}
 	} else {
 
-		fmt.Printf(">>> 3333333333333333333333333333 \n")
-
 		for i := 1; i < linering.NumVertexes(); i++ {
 			v2 := linering.Vertex(i).GeomPoint
 
@@ -478,7 +471,140 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 		}
 	}
 
-	fmt.Printf(">>> cn %v \n", cn)
 
 	return cn%2 == 1
+}
+
+// ClosestEdgeToEdge implements geodist.DistanceCalculator.
+func (g *geom3DDistanceCalculator) ClosestEdgeToEdge(edge1 geodist.Edge, edge2 geodist.Edge) (geodist.Point, geodist.Point, bool) {
+	start1 := edge1.V0.GeomPoint
+	end1 := edge1.V1.GeomPoint
+
+	start2 := edge2.V0.GeomPoint
+	end2 := edge2.V1.GeomPoint
+
+	pointToEdge := func(p geodist.Point, e geodist.Edge) (geodist.Point, geodist.Point, bool) {
+		ret, res := g.ClosestPointToEdge(e, p)
+		return p, ret, res
+	}
+
+	if coordEqual3D(start1, end1) {
+		panic("need testcase")
+		// return pointToEdge(edge1.V0, edge2)
+
+	}
+
+	if coordEqual3D(start2, end2) {
+		panic("need testcase")
+		// return pointToEdge(edge2.V0, edge1)
+		// ret, res := c.ClosestPointToEdge(edge1, edge2.V0)
+		// return edge2.V0, ret, res
+	}
+
+	if coordEqual3D(start1, start2) {
+		panic("need testcase")
+		// return edge1.V0, edge2.V0, true
+		// return pointToEdge( edge2.V0,edge1)
+		// distance should be 0
+	}
+
+	v1 := coordSub3D(end1, start1)
+	v2 := coordSub3D(end2, start2)
+	vl := coordSub3D(start1, start2)
+
+	a := coordDot3D(v1, v1)
+	b := coordDot3D(v1, v2)
+	c := coordDot3D(v2, v2)
+	d := coordDot3D(v1, vl)
+	e := coordDot3D(v2, vl)
+	D := a*c - b*b
+
+	var s1k, s2k float64
+
+	if D < 0.000000001 { /* the lines are almost parallel*/
+		s1k = 0.0
+		/*If the lines are parallel we try by using the startpoint of first segment. If that gives a
+		  projected point on the second line outside segment 2 it will be found that s2k is >1 or <0.*/
+
+		if b > c { /* use the largest denominator*/
+			s2k = d / b
+		} else {
+			s2k = e / c
+		}
+
+	} else {
+		s1k = (b*e - c*d) / D
+		s2k = (a*e - b*d) / D
+	}
+
+	// fmt.Printf(" \n")
+	// fmt.Printf(">>> v1 %v \n", v1)
+	// fmt.Printf(">>> v2 %v \n", v2)
+	// fmt.Printf(">>> vl %v \n", vl)
+	// fmt.Printf(">>> a %v \n", a)
+	// fmt.Printf(">>> b %v \n", b)
+	// fmt.Printf(">>> c %v \n", c)
+	// fmt.Printf(">>> d %v \n", d)
+	// fmt.Printf(">>> e %v \n", e)
+	// fmt.Printf(">>> s1k %v \n", s1k)
+	// fmt.Printf(">>> s2k %v \n", s2k)
+	// fmt.Printf(" \n")
+
+	/* Now we check if the projected closest point on the infinite lines is outside our segments. If so the
+	 * combinations with start and end points will be tested*/
+
+	if (s1k <= 0.0 || s1k >= 1.0 || s2k <= 0.0 || s2k >= 1.0) && true {
+
+		// this will check a vertex against edge of points..
+		if s1k <= 0.0 {
+			if ret1, ret2, ok := pointToEdge(edge1.V0, edge2); ok {
+				return ret1, ret2, ok
+			}
+		}
+		if s1k >= 1.0 {
+			if ret1, ret2, ok := pointToEdge(edge1.V1, edge2); ok {
+				return ret1, ret2, ok
+			}
+		}
+		if s2k <= 0.0 {
+			// dl->twisted = ((dl->twisted) * (-1));
+
+			if ret1, ret2, ok := pointToEdge(edge2.V0, edge1); ok {
+				return ret1, ret2, ok
+			}
+		}
+		if s2k >= 1.0 {
+			// dl->twisted = ((dl->twisted) * (-1));
+			if ret1, ret2, ok := pointToEdge(edge2.V1, edge1); ok {
+				return ret1, ret2, ok
+			}
+		}
+	} else { /*Find the closest point on the edges of both segments*/
+		// (s1p2->x - s1p1->x)
+		p1 := v1
+		p1 = coordMul3D(p1, s1k)
+		p1 = coordAdd3D(start1, p1)
+		// start1 + (v1 * s1k )
+		// p1.x = s1p1->x + s1k * (s1p2->x - s1p1->x);
+		// p1.y = s1p1->y + s1k * (s1p2->y - s1p1->y);
+		// p1.z = s1p1->z + s1k * (s1p2->z - s1p1->z);
+
+		p2 := v2
+		p2 = coordMul3D(p2, s2k)
+		p2 = coordAdd3D(start2, p2)
+		// p2.x = s2p1->x + s2k * (s2p2->x - s2p1->x);
+		// p2.y = s2p1->y + s2k * (s2p2->y - s2p1->y);
+		// p2.z = s2p1->z + s2k * (s2p2->z - s2p1->z);
+
+		// if !lw_dist3d_pt_pt(&p1, &p2, dl) {
+		// 	/* Send the closest points to point-point calculation*/
+		// 	return LW_FALSE
+		// }
+		res1 := geodist.Point{GeomPoint: p1}
+		res2 := geodist.Point{GeomPoint: p2}
+		return res1, res2, g.DistanceUpdater().Update(res1, res2)
+	}
+	// return false: we should not calc the distance between the points.
+	return geodist.Point{}, geodist.Point{}, false
+
 }

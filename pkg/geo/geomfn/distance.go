@@ -226,7 +226,7 @@ func minDistanceInternal(
 ) (float64, error) {
 
 	u := newGeomMinDistanceUpdater(stopAfter, exclusivity, force2D)
-	bbb := false
+	bbb := a.CartesianBoundingBox().Intersects(b.CartesianBoundingBox())
 	c := &geomDistanceCalculator{updater: u, boundingBoxIntersects: bbb}
 	return distanceInternal(a, b, c, emptyBehavior)
 }
@@ -636,6 +636,11 @@ func (u *geomMaxDistanceUpdater) FlipGeometries() {
 type geomDistanceCalculator struct {
 	updater               geodist.DistanceUpdater
 	boundingBoxIntersects bool
+}
+
+// ClosestEdgeToEdge implements geodist.DistanceCalculator.
+func (g *geomDistanceCalculator) ClosestEdgeToEdge(edge1 geodist.Edge, edge2 geodist.Edge) (geodist.Point, geodist.Point, bool) {
+	panic("unimplemented")
 }
 
 var _ geodist.DistanceCalculator = (*geomDistanceCalculator)(nil)

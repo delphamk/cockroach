@@ -120,6 +120,7 @@ type DistanceCalculator interface {
 	// ClosestPointToEdge returns the closest point to the infinite line denoted by
 	// the edge, and a bool on whether this point lies on the edge segment.
 	ClosestPointToEdge(edge Edge, point Point) (Point, bool)
+	ClosestEdgeToEdge(edge1 Edge, edge2 Edge) (Point, Point, bool)
 	ClosestPointToPolygon(point Point, poly Polygon) (Point, bool)
 	// BoundingBoxIntersects returns whether the bounding boxes of the shapes in
 	// question intersect.
@@ -201,11 +202,9 @@ func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (b
 			defer distCalc.DistanceUpdater().FlipGeometries()
 			return onPointToLineString(distCalc, *b, a), nil
 		case LineString:
-			return onShapeEdgesToShapeEdges(distCalc, a, b), nil
-		// case Polygon:
-		// 	fmt.Printf(">>> LINE TO POLYGON \n")
-
-		// 	return onLineStringToPolygon(distCalc, a, b), nil
+			return onShapeEdgesToShapeEdges3D(distCalc, a, b), nil
+		case Polygon:
+			return onLineStringToPolygon(distCalc, a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
@@ -373,6 +372,33 @@ func onShapeEdgesToShapeEdges(c DistanceCalculator, a shapeWithEdges, b shapeWit
 	return false
 }
 
+func onShapeEdgesToShapeEdges3D(c DistanceCalculator, a shapeWithEdges, b shapeWithEdges) bool {
+
+	for aEdgeIdx, aNumEdges := 0, a.NumEdges(); aEdgeIdx < aNumEdges; aEdgeIdx++ {
+		aEdge := a.Edge(aEdgeIdx)
+
+		for bEdgeIdx, bNumEdges := 0, b.NumEdges(); bEdgeIdx < bNumEdges; bEdgeIdx++ {
+			bEdge := b.Edge(bEdgeIdx)
+
+			// if any vertex is the same, we can stop
+			if c.DistanceUpdater().Update(aEdge.V0, bEdge.V0) ||
+				c.DistanceUpdater().Update(aEdge.V0, bEdge.V1) ||
+				c.DistanceUpdater().Update(aEdge.V1, bEdge.V0) ||
+				c.DistanceUpdater().Update(aEdge.V1, bEdge.V1) {
+				return true
+			}
+
+			if aClosest, bClosest, ok := c.ClosestEdgeToEdge(aEdge, bEdge); ok {
+				if c.DistanceUpdater().Update(aClosest, bClosest) {
+					return true
+				}
+			}
+
+		}
+	}
+	return false
+}
+
 // projectVertexToEdge attempts to project the point onto the given edge.
 // Returns true if the calling function should early exit.
 func projectVertexToEdge(c DistanceCalculator, vertex Point, edge Edge) bool {
@@ -400,7 +426,6 @@ func onLineStringToPolygon(c DistanceCalculator, line LineString, poly Polygon) 
 	//   check each point in the LineString.
 	// BoundingBoxIntersects: if the bounding box of the two shapes do not intersect,
 	//   then the distance is always from the LineString to the exterior ring.
-	fmt.Printf(">>> CHECK %v \n", c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)))
 	// fmt.Printf(">>> line.Vertex(0) %v \n", line.Vertex(0))
 	// fmt.Printf(">>> poly.LinearRing(0) %#v \n", poly.LinearRing(0))
 
@@ -411,13 +436,11 @@ func onLineStringToPolygon(c DistanceCalculator, line LineString, poly Polygon) 
 	if c.DistanceUpdater().IsMaxDistance() ||
 		!c.BoundingBoxIntersects() ||
 		!c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)) {
-		fmt.Printf(">>> 11111111 \n")
 
 		return onShapeEdgesToShapeEdges(c, line, poly.LinearRing(0))
 	}
 
-	fmt.Printf(">>> 22222222 \n")
-	fmt.Printf(">>> poly.NumLinearRings() %v \n", poly.NumLinearRings())
+
 	// if true {
 	// 	return onShapeEdgesToShapeEdges(c, line, poly.LinearRing(0))
 	// }
@@ -446,7 +469,6 @@ func onLineStringToPolygon(c DistanceCalculator, line LineString, poly Polygon) 
 		}
 	}
 
-	fmt.Printf(">>> 3333333 \n")
 
 	// This means we are inside the exterior ring, and no points are inside a hole.
 	// This means the point is inside the polygon.

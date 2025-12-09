@@ -335,6 +335,11 @@ type geographyDistanceCalculator struct {
 	boundingBoxIntersects bool
 }
 
+// ClosestEdgeToEdge implements geodist.DistanceCalculator.
+func (c *geographyDistanceCalculator) ClosestEdgeToEdge(edge1 geodist.Edge, edge2 geodist.Edge) (geodist.Point, geodist.Point, bool) {
+	panic("unimplemented")
+}
+
 // ClosestPointToPolygon implements geodist.DistanceCalculator.
 func (c *geographyDistanceCalculator) ClosestPointToPolygon(point geodist.Point, poly geodist.Polygon) (geodist.Point, bool) {
 	panic("unimplemented")

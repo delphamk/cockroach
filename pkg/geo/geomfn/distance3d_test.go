@@ -47,10 +47,24 @@ func TestCustomMinDistance3d(t *testing.T) {
 	// point is on the plane but projection is not on poly. It should not be 0
 	customDist3dTest(t, "POINT(0 100 1)", polygon1, 90, zero_accepted_error)
 
-	//linetype
+	// linetype
 	customDist3dTest(t, linestring0, point1, 1, zero_accepted_error)
 	customDist3dTest(t, linestring0, linestring1, 1, zero_accepted_error)
-	// customDist3dTest(t, linestring0, polygon1, 1.0, zero_accepted_error)
+
+	customDist3dTest(t, linestring0, polygon1, 1.0, zero_accepted_error)
+
+	// line cross not on vertex
+
+	// TODO: 	FAILING
+	customDist3dTest(t, "LINESTRING(-10 10 0, 10 -10 0)", "LINESTRING(-10 -10 0, 10 10 0)", 0, zero_accepted_error)
+	customDist3dTest(t, "LINESTRING(0 -10 10, 0 10 -10)", "LINESTRING(0 -10 -10, 0 10 10)", 0, zero_accepted_error)
+
+	// line closest to poly edge
+	// customDist3dTest(t, "LINESTRING(-100 0 0, -101 0 0)", polygon1, 90.00555538409837, zero_accepted_error)
+	// customDist3dTest(t, "LINESTRING(-100 0 1, -101 0 1)", polygon1, 90, zero_accepted_error)
+	// customDist3dTest(t, "LINESTRING(-1000 -1000 1, 1000 -1000 1)", polygon1, 990.0, zero_accepted_error)
+
+	// customDist3dTest(t, linestring0, polygon0, 0, zero_accepted_error)
 
 	//polygon
 	// customDist3dTest(t, polygon0, point1, 1, zero_accepted_error)
@@ -78,7 +92,7 @@ func customDist3dTest(t *testing.T, geo1 string, geo2 string, ans float64, toler
 
 	valid := inTolerance(dist, ans, tolerance)
 	if !valid {
-		err = fmt.Errorf("failed dist3dTest. \n\n\t\t [ \"%v\" != \"%v\"] (%v)", dist, ans, tolerance)
+		err = fmt.Errorf("failed dist3dTest. \n\n\t\tGOT: %v \n\t\tEXPECTED:%v", dist, ans)
 		fmt.Printf(">>> 1: %s \n", geo1)
 		fmt.Printf(">>> 2: %s \n", geo2)
 		fmt.Printf(">>> ERROR %s \n", err)
@@ -200,6 +214,83 @@ func TestCheckPointOnPoly(t *testing.T) {
 		fmt.Printf(">>> pointOnPoly: %v \n", valid)
 		require.Truef(t, valid == tc.inside, " result is not correct. got: %v expected: %v", valid, tc.inside)
 
+	}
+
+}
+
+func TestBoundingBox3D(t *testing.T) {
+
+	a, err := geo.ParseGeometry("LINESTRING(-10 10 10, 10 -10 10)")
+	if err != nil {
+		fmt.Printf(">>> err: %s\n", err)
+		return
+	}
+	require.NoError(t, err)
+
+	require.NoError(t, err)
+	a.CartesianBoundingBox()
+	fmt.Printf(">>> a BB: %v \n", a.SpatialObject().BoundingBox)
+
+	// bbb := a.CartesianBoundingBox().Intersects(b.CartesianBoundingBox())
+	// c := &geom3DDistanceCalculator{updater: u, boundingBoxIntersects: bbb}
+
+}
+
+func TestClosestEdgeToEdge(t *testing.T) {
+
+	testCases := []struct {
+		start1 geom.Coord
+		end1   geom.Coord
+		start2 geom.Coord
+		end2   geom.Coord
+		dist   float64
+		valid  bool
+	}{
+		{geom.Coord{-10, 0, 1}, geom.Coord{10, 0, 1}, geom.Coord{-10, 0, 0}, geom.Coord{10, 0, 0}, 1, true},
+		{geom.Coord{-10, 10, 0}, geom.Coord{10, -10, 0}, geom.Coord{-10, -10, 0}, geom.Coord{10, 10, 0}, 0, true},
+		{geom.Coord{-10, 10, 0}, geom.Coord{10, -10, 0}, geom.Coord{-10, -10, 1}, geom.Coord{10, 10, 1}, 1, true},
+	}
+
+	for i, tc := range testCases {
+		fmt.Printf(">>> %v %v \n", i, tc)
+
+		start1 := geodist.Point{GeomPoint: tc.start1}
+		end1 := geodist.Point{GeomPoint: tc.end1}
+		start2 := geodist.Point{GeomPoint: tc.start2}
+		end2 := geodist.Point{GeomPoint: tc.end2}
+
+		toString := func(p geodist.Point) string {
+			return fmt.Sprintf("%v %v %v", p.GeomPoint.X(), p.GeomPoint.Y(), p.GeomPoint[2])
+		}
+
+		x := fmt.Sprintf("select ST_3DDistance( 'LINESTRING(%v, %v)'::geometry, 'LINESTRING(%v, %v)'::geometry );", toString(start1), toString(end1), toString(start2), toString(end2))
+		fmt.Printf(">>> \n\n%s\n\n \n", x)
+
+		u := newGeomMin3DDistanceUpdater(0, geo.FnInclusive)
+		c := &geom3DDistanceCalculator{updater: u}
+		e1 := geodist.Edge{
+			V0: start1,
+			V1: end1,
+		}
+		e2 := geodist.Edge{
+			V0: start2,
+			V1: end2,
+		}
+
+		closest1, closest2, valid := c.ClosestEdgeToEdge(e1, e2)
+
+		if valid {
+			c.updater.Update(closest1, closest2)
+		}
+
+		fmt.Printf(">>> c1 %v \n", closest1.GeomPoint)
+		fmt.Printf(">>> c1 %v \n", closest2.GeomPoint)
+		fmt.Printf(">>> valid %v \n", valid)
+
+		fmt.Printf(">>> dist %v \n", c.updater.Distance())
+
+		// require.Equalf(t, tc.valid, valid, "valid not equal")
+		require.Equalf(t, tc.dist, c.updater.Distance(), "dist not equal")
 	}
 
 }
