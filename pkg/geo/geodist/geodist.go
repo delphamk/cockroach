@@ -220,8 +220,8 @@ func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (b
 				// defer to restore the order of geometries at the end of the function call.
 				defer distCalc.DistanceUpdater().FlipGeometries()
 				return onLineStringToPolygon(distCalc, b, a), nil
-			// case Polygon:
-			// 	return onPolygonToPolygon(distCalc, a, b), nil
+			case Polygon:
+				return onPolygonToPolygon(distCalc, a, b), nil
 			default:
 				return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 			}

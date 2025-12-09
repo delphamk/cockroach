@@ -7,6 +7,7 @@ package geomfn
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/cockroachdb/cockroach/pkg/geo"
@@ -29,6 +30,24 @@ var _ = polygon0
 var _ = polygon1
 
 var tolerance = 0.001
+
+func polygonFromRect(x1, y1, x2, y2, z float64) string {
+	// if x1 > x2 {
+	// 	x1, x2 = x2, x1
+	// }
+	// if y1 > y2 {
+	// 	y1, y2 = y2, y1
+	// }
+	points := []string{
+		fmt.Sprintf("%.6g %.6g %g", x1, y1, z),
+		fmt.Sprintf("%.6g %.6g %g", x2, y1, z),
+		fmt.Sprintf("%.6g %.6g %g", x2, y2, z),
+		fmt.Sprintf("%.6g %.6g %g", x1, y2, z),
+		fmt.Sprintf("%.6g %.6g %g", x1, y1, z), // closing point
+	}
+
+	return "POLYGON((" + fmt.Sprintf("%s", strings.Join(points, ", ")) + "))"
+}
 
 func TestCustomMinDistance3d(t *testing.T) {
 
@@ -66,7 +85,32 @@ func TestCustomMinDistance3d(t *testing.T) {
 	//polygon
 	customDist3dTest(t, polygon0, point1, 1, zero_accepted_error)
 	customDist3dTest(t, polygon0, linestring1, 1, zero_accepted_error)
-	// customDist3dTest(t, polygon0, polygon1, 1, zero_accepted_error)
+	customDist3dTest(t, polygon0, polygon1, 1, zero_accepted_error)
+
+	customDist3dTest(t,
+		polygonFromRect(1, 1, 2, 2, 0),
+		polygonFromRect(3, 3, 4, 4, 0),
+		1.4142135623730951, zero_accepted_error)
+
+	customDist3dTest(t,
+		polygonFromRect(1, 1, 2, 2, 0),
+		polygonFromRect(3, 3, 4, 4, 5),
+		5.196152422706632, zero_accepted_error)
+
+	customDist3dTest(t,
+		polygonFromRect(1, 1, 10, 10, 0),
+		polygonFromRect(10, 10, 1, 1, 5),
+		5, zero_accepted_error)
+
+	customDist3dTest(t,
+		polygonFromRect(1, 1, 10, 10, 0),
+		polygonFromRect(10, 10, 1, 1, 0),
+		0, zero_accepted_error)
+
+	// customDist3dTest(t,
+	// 	"POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))",
+	// 	"POLYGON((-10 -10 0, 10 -10 0, 10 10 0, -10 10 0, -10 -10 0))",
+	// 	0, zero_accepted_error)
 
 }
 
