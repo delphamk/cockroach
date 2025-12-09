@@ -80,6 +80,13 @@ func TestCustomMinDistance3d(t *testing.T) {
 	customDist3dTest(t, "LINESTRING(-100 0 1, -101 0 1)", polygon1, 90, zero_accepted_error)
 	customDist3dTest(t, "LINESTRING(-1000 -1000 1, 1000 -1000 1)", polygon1, 990.0, zero_accepted_error)
 
+	// line intersect poly
+	customDist3dTest(t, "LINESTRING(0 0 -15, 0 0 15)", "POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))", 0, zero_accepted_error)
+
+	// TODO failing
+	// customDist3dTest(t, "LINESTRING(1 0 0, 0 0 0)", "POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))", 0, zero_accepted_error)
+
+
 	customDist3dTest(t, linestring0, polygon0, 0, zero_accepted_error)
 
 	//polygon

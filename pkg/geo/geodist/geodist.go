@@ -155,8 +155,6 @@ func ShapeDistance(distCalc DistanceCalculator, aShape Shape, bShape Shape) (boo
 		case LineString:
 			return onShapeEdgesToShapeEdges(distCalc, a, b), nil
 		case Polygon:
-			fmt.Printf(">>> LINE TO POLYGON \n")
-
 			return onLineStringToPolygon(distCalc, a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
@@ -204,7 +202,7 @@ func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (b
 		case LineString:
 			return onShapeEdgesToShapeEdges3D(distCalc, a, b), nil
 		case Polygon:
-			return onLineStringToPolygon(distCalc, a, b), nil
+			return onLineStringToPolygon3D(distCalc, a, b), nil
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
@@ -460,6 +458,37 @@ func onLineStringToPolygon(c DistanceCalculator, line LineString, poly Polygon) 
 	for ringIdx := 1; ringIdx < poly.NumLinearRings(); ringIdx++ {
 		hole := poly.LinearRing(ringIdx)
 		if onShapeEdgesToShapeEdges(c, line, hole) {
+			return true
+		}
+		for pointIdx := 0; pointIdx < line.NumVertexes(); pointIdx++ {
+			if c.PointIntersectsLinearRing(line.Vertex(pointIdx), hole) {
+				return false
+			}
+		}
+	}
+
+
+	// This means we are inside the exterior ring, and no points are inside a hole.
+	// This means the point is inside the polygon.
+	return c.DistanceUpdater().OnIntersects(line.Vertex(0))
+}
+
+
+// onLineStringToPolygon updates the distance between a polyline and a polygon.
+// Returns true if the calling function should early exit.
+func onLineStringToPolygon3D(c DistanceCalculator, line LineString, poly Polygon) bool {
+
+	if c.DistanceUpdater().IsMaxDistance() ||
+		!c.BoundingBoxIntersects() ||
+		!c.PointIntersectsLinearRing(line.Vertex(0), poly.LinearRing(0)) {
+
+		return onShapeEdgesToShapeEdges3D(c, line, poly.LinearRing(0))
+	}
+
+	//   is the distance of this polyline to this polygon.
+	for ringIdx := 1; ringIdx < poly.NumLinearRings(); ringIdx++ {
+		hole := poly.LinearRing(ringIdx)
+		if onShapeEdgesToShapeEdges3D(c, line, hole) {
 			return true
 		}
 		for pointIdx := 0; pointIdx < line.NumVertexes(); pointIdx++ {
