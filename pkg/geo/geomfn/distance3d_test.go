@@ -50,25 +50,22 @@ func TestCustomMinDistance3d(t *testing.T) {
 	// linetype
 	customDist3dTest(t, linestring0, point1, 1, zero_accepted_error)
 	customDist3dTest(t, linestring0, linestring1, 1, zero_accepted_error)
-
-	customDist3dTest(t, linestring0, polygon1, 1.0, zero_accepted_error)
+	customDist3dTest(t, linestring0, polygon1, 1, zero_accepted_error)
 
 	// line cross not on vertex
-
-	// TODO: 	FAILING
 	customDist3dTest(t, "LINESTRING(-10 10 0, 10 -10 0)", "LINESTRING(-10 -10 0, 10 10 0)", 0, zero_accepted_error)
 	customDist3dTest(t, "LINESTRING(0 -10 10, 0 10 -10)", "LINESTRING(0 -10 -10, 0 10 10)", 0, zero_accepted_error)
 
 	// line closest to poly edge
-	// customDist3dTest(t, "LINESTRING(-100 0 0, -101 0 0)", polygon1, 90.00555538409837, zero_accepted_error)
-	// customDist3dTest(t, "LINESTRING(-100 0 1, -101 0 1)", polygon1, 90, zero_accepted_error)
-	// customDist3dTest(t, "LINESTRING(-1000 -1000 1, 1000 -1000 1)", polygon1, 990.0, zero_accepted_error)
+	customDist3dTest(t, "LINESTRING(-100 0 0, -101 0 0)", polygon1, 90.00555538409837, zero_accepted_error)
+	customDist3dTest(t, "LINESTRING(-100 0 1, -101 0 1)", polygon1, 90, zero_accepted_error)
+	customDist3dTest(t, "LINESTRING(-1000 -1000 1, 1000 -1000 1)", polygon1, 990.0, zero_accepted_error)
 
-	// customDist3dTest(t, linestring0, polygon0, 0, zero_accepted_error)
+	customDist3dTest(t, linestring0, polygon0, 0, zero_accepted_error)
 
 	//polygon
-	// customDist3dTest(t, polygon0, point1, 1, zero_accepted_error)
-	// customDist3dTest(t, polygon0, linestring1, 1, zero_accepted_error)
+	customDist3dTest(t, polygon0, point1, 1, zero_accepted_error)
+	customDist3dTest(t, polygon0, linestring1, 1, zero_accepted_error)
 	// customDist3dTest(t, polygon0, polygon1, 1, zero_accepted_error)
 
 }

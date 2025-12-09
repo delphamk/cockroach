@@ -208,23 +208,23 @@ func ShapeDistance3D(distCalc DistanceCalculator, aShape Shape, bShape Shape) (b
 		default:
 			return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
 		}
-		// case Polygon:
-		// 	switch b := bShape.(type) {
-		// 	case *Point:
-		// 		distCalc.DistanceUpdater().FlipGeometries()
-		// 		// defer to restore the order of geometries at the end of the function call.
-		// 		defer distCalc.DistanceUpdater().FlipGeometries()
-		// 		return onPointToPolygon(distCalc, *b, a), nil
-		// 	case LineString:
-		// 		distCalc.DistanceUpdater().FlipGeometries()
-		// 		// defer to restore the order of geometries at the end of the function call.
-		// 		defer distCalc.DistanceUpdater().FlipGeometries()
-		// 		return onLineStringToPolygon(distCalc, b, a), nil
-		// 	case Polygon:
-		// 		return onPolygonToPolygon(distCalc, a, b), nil
-		// 	default:
-		// 		return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
-		// 	}
+		case Polygon:
+			switch b := bShape.(type) {
+			case *Point:
+				distCalc.DistanceUpdater().FlipGeometries()
+				// defer to restore the order of geometries at the end of the function call.
+				defer distCalc.DistanceUpdater().FlipGeometries()
+				return onPointToPolygon3D(distCalc, *b, a), nil
+			case LineString:
+				distCalc.DistanceUpdater().FlipGeometries()
+				// defer to restore the order of geometries at the end of the function call.
+				defer distCalc.DistanceUpdater().FlipGeometries()
+				return onLineStringToPolygon(distCalc, b, a), nil
+			// case Polygon:
+			// 	return onPolygonToPolygon(distCalc, a, b), nil
+			default:
+				return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", b)
+			}
 	}
 	return false, pgerror.Newf(pgcode.InvalidParameterValue, "unknown shape: %T", aShape)
 }
@@ -316,8 +316,8 @@ func onPointToPolygon3D(c DistanceCalculator, a Point, b Polygon) bool {
 // only looking at the edges.
 // Returns true if the calling function should early exit.
 func onShapeEdgesToShapeEdges(c DistanceCalculator, a shapeWithEdges, b shapeWithEdges) bool {
-	fmt.Printf(">>> a.NumEdges() %v \n", a.NumEdges())
-	fmt.Printf(">>> b.NumEdges() %v \n", b.NumEdges())
+	// fmt.Printf(">>> a.NumEdges() %v \n", a.NumEdges())
+	// fmt.Printf(">>> b.NumEdges() %v \n", b.NumEdges())
 
 	for aEdgeIdx, aNumEdges := 0, a.NumEdges(); aEdgeIdx < aNumEdges; aEdgeIdx++ {
 

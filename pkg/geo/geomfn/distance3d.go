@@ -1,7 +1,6 @@
 package geomfn
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/cockroachdb/cockroach/pkg/geo"
@@ -397,7 +396,7 @@ func ProjectPointOnPlan(point geodist.Point, pop geodist.Point, pv geodist.Point
 	mul := coordMul3D(pv.GeomPoint, f)
 
 	projectedPoint := coordAdd3D(point.GeomPoint, mul)
-	fmt.Printf(">>>  projectedPoint %v\n", projectedPoint)
+	// fmt.Printf(">>>  projectedPoint %v\n", projectedPoint)
 
 	return geodist.Point{GeomPoint: projectedPoint}
 }
