@@ -386,7 +386,7 @@ func onShapeEdgesToShapeEdges3D(c DistanceCalculator, a shapeWithEdges, b shapeW
 				return true
 			}
 
-			if aClosest, bClosest, ok := c.ClosestEdgeToEdge(aEdge, bEdge); ok {
+ 			if aClosest, bClosest, ok := c.ClosestEdgeToEdge(aEdge, bEdge); ok {
 				if c.DistanceUpdater().Update(aClosest, bClosest) {
 					return true
 				}

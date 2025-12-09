@@ -470,7 +470,6 @@ func CheckPointOnPoly(point geodist.Point, pop geodist.Point, pvector geodist.Po
 		}
 	}
 
-
 	return cn%2 == 1
 }
 

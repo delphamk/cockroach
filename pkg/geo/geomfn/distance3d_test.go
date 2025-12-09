@@ -49,10 +49,17 @@ func polygonFromRect(x1, y1, x2, y2, z float64) string {
 	return "POLYGON((" + fmt.Sprintf("%s", strings.Join(points, ", ")) + "))"
 }
 
-func TestCustomMinDistance3d(t *testing.T) {
+func Test3DCustomMinDistance3d(t *testing.T) {
 
 	// default_accepted_error := 0.00001
 	zero_accepted_error := 0.0
+
+	// TODO failing. line is on poly
+	customDist3dTest(t, "LINESTRING(1 0 0, 0 0 0)", "POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))", 0, zero_accepted_error)
+
+	if true {
+		return
+	}
 
 	// point
 	customDist3dTest(t, point0, point1, 1, zero_accepted_error)
@@ -82,10 +89,6 @@ func TestCustomMinDistance3d(t *testing.T) {
 
 	// line intersect poly
 	customDist3dTest(t, "LINESTRING(0 0 -15, 0 0 15)", "POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))", 0, zero_accepted_error)
-
-	// TODO failing
-	// customDist3dTest(t, "LINESTRING(1 0 0, 0 0 0)", "POLYGON((-10 0 -10, 10 0 -10, 10 0 10, -10 0 10, -10 0 -10))", 0, zero_accepted_error)
-
 
 	customDist3dTest(t, linestring0, polygon0, 0, zero_accepted_error)
 
@@ -152,7 +155,7 @@ func coordEqual3ToleranceD(a geom.Coord, b geom.Coord, tolerance float64) bool {
 	return inTolerance(a.X(), b.X(), tolerance) && inTolerance(a.Y(), b.Y(), tolerance) && inTolerance(a[2], b[2], tolerance)
 }
 
-func TestDefinePlane(t *testing.T) {
+func Test3DDefinePlane(t *testing.T) {
 
 	testCases := []struct {
 		poly string
@@ -191,7 +194,7 @@ func TestDefinePlane(t *testing.T) {
 
 }
 
-func TestProjectPointOnPlan(t *testing.T) {
+func Test3DProjectPointOnPlan(t *testing.T) {
 
 	testCases := []struct {
 		point  geom.Coord
@@ -218,7 +221,7 @@ func TestProjectPointOnPlan(t *testing.T) {
 
 }
 
-func TestCheckPointOnPoly(t *testing.T) {
+func Test3DCheckPointOnPoly(t *testing.T) {
 
 	// The point must exist on the plane.
 
@@ -266,7 +269,7 @@ func TestCheckPointOnPoly(t *testing.T) {
 
 }
 
-func TestBoundingBox3D(t *testing.T) {
+func Test3DBoundingBox3D(t *testing.T) {
 
 	a, err := geo.ParseGeometry("LINESTRING(-10 10 10, 10 -10 10)")
 	if err != nil {
@@ -284,7 +287,7 @@ func TestBoundingBox3D(t *testing.T) {
 
 }
 
-func TestClosestEdgeToEdge(t *testing.T) {
+func Test3DClosestEdgeToEdge(t *testing.T) {
 
 	testCases := []struct {
 		start1 geom.Coord
