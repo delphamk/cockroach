@@ -2862,7 +2862,6 @@ var builtinOidsArray = []string{
 	2908: `crdb_internal.inject_hint(statement_fingerprint: string, donor_sql: string) -> int`,
 	2909: `crdb_internal.clear_statement_hints_cache() -> void`,
 	2910: `crdb_internal.await_statement_hints_cache() -> void`,
-
 	254:  `st_makeline(arg1: geometry) -> geometry`, // here
 	2911: `st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry`, // here
 	// 2912: `st_makeline(geometry: geometry) -> geometry`, // here

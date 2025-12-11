@@ -7300,11 +7300,11 @@ Can be used to define the tile bounds required by ST_AsMVTGeom to convert geomet
 		),
 		geometryOverload2( // st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry
 			func(_ context.Context, _ *eval.Context, a *tree.DGeometry, b *tree.DGeometry) (tree.Datum, error) {
-				for i := 0; i < 10; i++ {
-						fmt.Printf(">>>  geometryOverload2!!!!!!\n")
+				line, err := geomfn.MakeLine(a.Geometry, b.Geometry)
+				if err != nil {
+					return nil, err
 				}
-				
-				return a, nil
+				return &tree.DGeometry{Geometry: line}, nil
 			},
 			types.Geometry,
 			infoBuilder{
