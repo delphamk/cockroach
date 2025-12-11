@@ -165,6 +165,9 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 		case *geom.MultiPoint:
 			flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
 		case *geom.LineString:
+			if t.Layout() != layout {
+				return nil, errors.New("wrong layout")
+			}
 			lineFlatCoords := t.FlatCoords()
 			/* If the end point and start point are the same, then don't copy start point */
 			if len(flatCoords) >= layout.Stride() {
@@ -176,6 +179,9 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 			flatCoords = append(flatCoords, lineFlatCoords...)
 		case *geom.MultiLineString:
 			// postgis allows for multilinestring but has no ussage?
+			if t.Layout() != layout {
+				return nil, errors.New("wrong layout")
+			}
 
 			for i := 0; i < t.NumLineStrings(); i++ {
 				line := t.LineString(i)

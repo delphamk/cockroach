@@ -112,6 +112,32 @@ func TestMakeLine(t *testing.T) {
 			require.EqualValues(t, srid, result.SRID())
 		})
 	}
+
+	errorTestCases := []struct {
+		wkt1 string
+		wkt2 string
+	}{
+		// 2d line + 3d line
+		{"LINESTRING (1 1, 2 2)", "LINESTRING (1 1 1, 2 2 2)"},
+	}
+
+	t.Run("Errors on invalid input", func(t *testing.T) {
+		for i, tc := range errorTestCases {
+			t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+				srid := geopb.SRID(4000)
+
+				g1, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt1), srid, true)
+				require.NoError(t, err)
+
+				g2, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt2), srid, true)
+				require.NoError(t, err)
+
+				_, err = MakeLine(g1, g2)
+				require.Error(t, err)
+
+			})
+		}
+	})
 }
 
 func TestMakeLineArray(t *testing.T) {
@@ -166,6 +192,34 @@ func TestMakeLineArray(t *testing.T) {
 			}
 		})
 	}
+
+
+	errorTestCases := []struct {
+		wkt      []string
+	}{
+		// 2d line + 3d line
+		{[]string{"LINESTRING (1 1, 2 2)", "LINESTRING (1 1 1, 2 2 2)"}},
+	}
+
+	t.Run("Errors on invalid input", func(t *testing.T) {
+		for i, tc := range errorTestCases {
+			t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+				srid := geopb.SRID(4000)
+
+			geos := []geo.Geometry{}
+
+			for _, wkt := range tc.wkt {
+				g, err := geo.ParseGeometryFromEWKT(geopb.EWKT(wkt), srid, true)
+				require.NoError(t, err)
+				geos = append(geos, g)
+			}
+
+				_, err := MakeLineArray(geos)
+				require.Error(t, err)
+
+			})
+		}
+	})
 }
 
 func TestLineMerge(t *testing.T) {
