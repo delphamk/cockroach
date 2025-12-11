@@ -134,6 +134,9 @@ func TestMakeLineArray(t *testing.T) {
 		// ignore geomtries that are not POINT, MULTIPOINT, or LINESTRING
 		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "MULTILINESTRING((0 0,1 1),(2 2,3 3),(4 4,5 5))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
 		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "POLYGON((3 3, 4 4, 2 2, 3 3))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
+
+		// null test
+		{[]string{}, "LINESTRING EMPTY"},
 	}
 
 	for i, tc := range testCases {
@@ -155,7 +158,9 @@ func TestMakeLineArray(t *testing.T) {
 
 			require.NoError(t, err)
 			require.EqualValues(t, tc.expected, wkt)
-			require.EqualValues(t, srid, result.SRID())
+			if !result.Empty() {
+				require.EqualValues(t, srid, result.SRID())
+			}
 		})
 	}
 }

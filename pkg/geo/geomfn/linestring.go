@@ -82,18 +82,27 @@ func MakeLine(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
 	if aGeomT.SRID() != bGeomT.SRID() {
 		return geo.Geometry{}, errors.New("SRID mismatch")
 	}
-	return MakeLineFromGeomTArray(aGeomT.SRID(), []geom.T{aGeomT, bGeomT})
+
+	lineString, err := MakeLineFromGeomTArray(aGeomT.SRID(), []geom.T{aGeomT, bGeomT})
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+	return geo.MakeGeometryFromGeomT(lineString)
 }
 
-func MakeLineArray(b []geo.Geometry) (geo.Geometry, error) {
+func MakeLineArray(geos []geo.Geometry) (geo.Geometry, error) {
 	// verify >1 element
 	// create geos list. ignore invalid types
 	// first valid, get the srid. if srid does not mactch error.
 
+	if len(geos) == 0 {
+		return geo.MakeGeometryFromGeomT(geom.NewLineString(geom.XY))
+	}
+
 	geoms := []geom.T{}
 	var srid int
 
-	for _, g := range b {
+	for _, g := range geos {
 		geomT, err := g.AsGeomT()
 		if err != nil {
 			return geo.Geometry{}, err
@@ -119,11 +128,14 @@ func MakeLineArray(b []geo.Geometry) (geo.Geometry, error) {
 	if len(geoms) == 0 {
 		return geo.Geometry{}, errors.New("no valid geoms")
 	}
-
-	return MakeLineFromGeomTArray(srid, geoms)
+	lineString, err := MakeLineFromGeomTArray(srid, geoms)
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+	return geo.MakeGeometryFromGeomT(lineString)
 }
 
-func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geo.Geometry, error) {
+func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 	// check for Z and M
 	// create points array with dimension
 	// add points to array. depending on type, maybe skip.. other errors
@@ -164,8 +176,8 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geo.Geometry, error) {
 			}
 			flatCoords = append(flatCoords, lineFlatCoords...)
 		case *geom.MultiLineString:
-			fmt.Printf(">>>  MultiLineString!!!!!!! %v\n",t.NumLineStrings())
-			
+			fmt.Printf(">>>  MultiLineString!!!!!!! %v\n", t.NumLineStrings())
+
 			for i := 0; i < t.NumLineStrings(); i++ {
 				line := t.LineString(i)
 				if line.Empty() {
@@ -186,7 +198,7 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geo.Geometry, error) {
 		}
 	}
 	lineString := geom.NewLineStringFlat(layout, flatCoords).SetSRID(srid)
-	return geo.MakeGeometryFromGeomT(lineString)
+	return lineString, nil
 
 }
 
