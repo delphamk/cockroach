@@ -82,6 +82,8 @@ func TestMakeLine(t *testing.T) {
 		{"POINT (1 2)", "POINT (3 4)", "LINESTRING (1 2, 3 4)"},
 		{"LINESTRING (1 2, 3 4)", "POINT (5 5)", "LINESTRING (1 2, 3 4, 5 5)"},
 		{"POINT (1 2 1)", "POINT (3 4 2)", "LINESTRING Z (1 2 1, 3 4 2)"},
+		{"POINT EMPTY", "LINESTRING (1 1, 2 2)", "LINESTRING (1 1, 2 2)"},
+		{"POINT EMPTY", "POINT EMPTY", "LINESTRING EMPTY"},
 
 		// force 2d point to 3d
 		{"POINT (1 1)", "POINT (2 2 2)", "LINESTRING Z (1 1 0, 2 2 2)"},
@@ -137,6 +139,7 @@ func TestMakeLineArray(t *testing.T) {
 
 		// null test
 		{[]string{}, "LINESTRING EMPTY"},
+		{[]string{"LINESTRING EMPTY"}, "LINESTRING EMPTY"},
 	}
 
 	for i, tc := range testCases {

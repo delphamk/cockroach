@@ -6,8 +6,6 @@
 package geomfn
 
 import (
-	"fmt"
-
 	"github.com/cockroachdb/cockroach/pkg/geo"
 	"github.com/cockroachdb/cockroach/pkg/geo/geos"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -126,7 +124,8 @@ func MakeLineArray(geos []geo.Geometry) (geo.Geometry, error) {
 	}
 
 	if len(geoms) == 0 {
-		return geo.Geometry{}, errors.New("no valid geoms")
+		// TODO add log for unused geoms. "No points or linestrings in input array"
+		return geo.MakeGeometryFromGeomT(geom.NewLineString(geom.XY))
 	}
 	lineString, err := MakeLineFromGeomTArray(srid, geoms)
 	if err != nil {
@@ -176,7 +175,6 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 			}
 			flatCoords = append(flatCoords, lineFlatCoords...)
 		case *geom.MultiLineString:
-			fmt.Printf(">>>  MultiLineString!!!!!!! %v\n", t.NumLineStrings())
 
 			for i := 0; i < t.NumLineStrings(); i++ {
 				line := t.LineString(i)
