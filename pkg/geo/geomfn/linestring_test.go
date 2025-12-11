@@ -130,6 +130,10 @@ func TestMakeLineArray(t *testing.T) {
 		// remove duplicate start point
 		{[]string{"POINT (4 3 4)", "LINESTRING Z(4 3 4, 3 2 3)"}, "LINESTRING Z (4 3 4, 3 2 3)"},
 		{[]string{"LINESTRING Z(1 3 1, 4 3 4)", "LINESTRING Z(4 3 4, 3 2 3)"}, "LINESTRING Z (1 3 1, 4 3 4, 3 2 3)"},
+
+		// ignore geomtries that are not POINT, MULTIPOINT, or LINESTRING
+		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "MULTILINESTRING((0 0,1 1),(2 2,3 3),(4 4,5 5))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
+		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "POLYGON((3 3, 4 4, 2 2, 3 3))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
 	}
 
 	for i, tc := range testCases {
