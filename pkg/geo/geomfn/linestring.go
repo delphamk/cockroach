@@ -175,6 +175,7 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 			}
 			flatCoords = append(flatCoords, lineFlatCoords...)
 		case *geom.MultiLineString:
+			// postgis allows for multilinestring but has no ussage?
 
 			for i := 0; i < t.NumLineStrings(); i++ {
 				line := t.LineString(i)
