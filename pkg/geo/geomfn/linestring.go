@@ -6,6 +6,8 @@
 package geomfn
 
 import (
+	"fmt"
+
 	"github.com/cockroachdb/cockroach/pkg/geo"
 	"github.com/cockroachdb/cockroach/pkg/geo/geos"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -83,7 +85,7 @@ func MakeLine(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
 	return MakeLineFromGeomTArray(aGeomT.SRID(), []geom.T{aGeomT, bGeomT})
 }
 
-func MakeLineArrray(b ...geo.Geometry) (geo.Geometry, error) {
+func MakeLineArray(b []geo.Geometry) (geo.Geometry, error) {
 	// verify >1 element
 	// create geos list. ignore invalid types
 	// first valid, get the srid. if srid does not mactch error.
@@ -162,6 +164,8 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geo.Geometry, error) {
 			}
 			flatCoords = append(flatCoords, lineFlatCoords...)
 		case *geom.MultiLineString:
+			fmt.Printf(">>>  MultiLineString!!!!!!! %v\n",t.NumLineStrings())
+			
 			for i := 0; i < t.NumLineStrings(); i++ {
 				line := t.LineString(i)
 				if line.Empty() {
