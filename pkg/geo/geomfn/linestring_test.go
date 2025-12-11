@@ -166,6 +166,8 @@ func TestMakeLineArray(t *testing.T) {
 		// null test
 		{[]string{}, "LINESTRING EMPTY"},
 		{[]string{"LINESTRING EMPTY"}, "LINESTRING EMPTY"},
+		{[]string{"POINT (1 1)", "LINESTRING EMPTY", "POINT (3 2)",}, "LINESTRING (1 1, 3 2)"},
+
 	}
 
 	for i, tc := range testCases {
