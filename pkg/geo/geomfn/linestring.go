@@ -60,22 +60,18 @@ func MakeLine(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
 	if err != nil {
 		return geo.Geometry{}, err
 	}
+
 	switch aGeomT.(type) {
-	case *geom.Point:
-	case *geom.MultiPoint:
-	case *geom.LineString:
-	case *geom.MultiLineString:
+	case *geom.Point, *geom.MultiPoint, *geom.LineString, *geom.MultiLineString:
 	default:
 		return geo.Geometry{}, errors.New("invalid type")
 	}
 	switch bGeomT.(type) {
-	case *geom.Point:
-	case *geom.MultiPoint:
-	case *geom.LineString:
-	case *geom.MultiLineString:
+	case *geom.Point, *geom.MultiPoint, *geom.LineString, *geom.MultiLineString:
 	default:
 		return geo.Geometry{}, errors.New("invalid type")
 	}
+	// pgerror.Newf(pgcode.InvalidParameterValue, "object type %s does not match column dimensionality %s", so.ShapeType, shapeType)
 
 	if aGeomT.SRID() != bGeomT.SRID() {
 		return geo.Geometry{}, errors.New("SRID mismatch")
@@ -107,9 +103,7 @@ func MakeLineArray(geos []geo.Geometry) (geo.Geometry, error) {
 		}
 
 		switch geomT.(type) {
-		case *geom.Point:
-		case *geom.MultiPoint:
-		case *geom.LineString:
+		case *geom.Point, *geom.MultiPoint, *geom.LineString:
 		default:
 			continue
 		}
@@ -120,7 +114,6 @@ func MakeLineArray(geos []geo.Geometry) (geo.Geometry, error) {
 		} else if srid != geomT.SRID() {
 			return geo.Geometry{}, errors.New("SRID mismatch")
 		}
-
 	}
 
 	if len(geoms) == 0 {
