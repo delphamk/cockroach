@@ -147,13 +147,7 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 		}
 	}
 
-	// if coords empty, return empty line
-
 	flatCoords := make([]float64, 0, len(geoms)*layout.Stride())
-
-	// forceFlatCoordsLayout
-
-	var lastPoint geom.Coord
 
 	for _, t := range geoms {
 		if t.Empty() {
@@ -161,18 +155,26 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 		}
 		switch t := t.(type) {
 		case *geom.Point:
-			flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			if t.Layout() == layout {
+				flatCoords = append(flatCoords, t.FlatCoords()...)
+			} else {
+				flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			}
 		case *geom.MultiPoint:
-			flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			if t.Layout() == layout {
+				flatCoords = append(flatCoords, t.FlatCoords()...)
+			} else {
+				flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			}
 		case *geom.LineString:
 			if t.Layout() != layout {
 				return nil, errors.New("wrong layout")
 			}
 			lineFlatCoords := t.FlatCoords()
-			/* If the end point and start point are the same, then don't copy start point */
+			// If the end point and start point are the same, then don't copy start point
 			if len(flatCoords) >= layout.Stride() {
-				lastPoint = flatCoords[len(flatCoords)-layout.Stride():]
-				if lastPoint.Equal(layout, lineFlatCoords[:layout.Stride()]) {
+				lastCoord := geom.Coord(flatCoords[len(flatCoords)-layout.Stride():])
+				if lastCoord.Equal(layout, lineFlatCoords[:layout.Stride()]) {
 					lineFlatCoords = lineFlatCoords[layout.Stride():]
 				}
 			}
@@ -189,10 +191,10 @@ func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
 					continue
 				}
 				lineFlatCoords := t.FlatCoords()
-				/* If the end point and start point are the same, then don't copy start point */
+				// If the end point and start point are the same, then don't copy start point
 				if len(flatCoords) >= layout.Stride() {
-					lastPoint = flatCoords[len(flatCoords)-layout.Stride():]
-					if lastPoint.Equal(layout, lineFlatCoords[:layout.Stride()]) {
+					lastCoord := geom.Coord(flatCoords[len(flatCoords)-layout.Stride():])
+					if lastCoord.Equal(layout, lineFlatCoords[:layout.Stride()]) {
 						lineFlatCoords = lineFlatCoords[layout.Stride():]
 					}
 				}
