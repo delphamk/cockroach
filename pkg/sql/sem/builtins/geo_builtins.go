@@ -7282,7 +7282,37 @@ Can be used to define the tile bounds required by ST_AsMVTGeom to convert geomet
 			CalledOnNullInput: true,
 		},
 	),
-
+	"st_makeline": makeBuiltin(
+		tree.FunctionProperties{
+			AvailableOnPublicSchema: true,
+		},
+		makeAggOverload( // st_makeline(arg1: geometry) -> geometry
+			[]*types.T{types.Geometry},
+			types.Geometry,
+			func(params []*types.T, evalCtx *eval.Context, arguments tree.Datums) eval.AggregateFunc {
+				return &stMakeLineAgg{
+					acc: evalCtx.Planner.Mon().MakeBoundAccount(),
+				}
+			},
+			infoBuilder{info: "Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored."}.String(),
+			volatility.Immutable,
+			true, /* calledOnNullInput */
+		),
+		geometryOverload2( // st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry
+			func(_ context.Context, _ *eval.Context, a *tree.DGeometry, b *tree.DGeometry) (tree.Datum, error) {
+				for i := 0; i < 10; i++ {
+						fmt.Printf(">>>  geometryOverload2!!!!!!\n")
+				}
+				
+				return a, nil
+			},
+			types.Geometry,
+			infoBuilder{
+				info: "Creates a LineString containing the points of Point, MultiPoint, or LineString geometries. Other geometry types cause an error. ",
+			},
+			volatility.Immutable,
+		),
+	),
 	//
 	// Unimplemented.
 	//

@@ -1076,7 +1076,11 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 	// overload. This is fine at the moment since we don't allow creating
 	// aggregate/window functions yet. But, ideally, we should figure out a way
 	// to do this check after overload resolution.
-	fnCls, err := def.GetClass()
+	hasAggregate, err := def.HasClass(AggregateClass)
+	if err != nil {
+		return err
+	}
+	hasGenerator, err := def.HasClass(GeneratorClass)
 	if err != nil {
 		return err
 	}
@@ -1093,7 +1097,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 	} else {
 		// If it is an aggregate function *not used OVER a window*, then
 		// we have an aggregation.
-		if fnCls == AggregateClass {
+		if hasAggregate {
 			if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
 				sc.Properties.IsSet(RejectNestedAggregates) {
 				return NewAggInAggError()
@@ -1104,7 +1108,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 			sc.Properties.Derived.SeenAggregate = true
 		}
 	}
-	if fnCls == GeneratorClass {
+	if hasGenerator {
 		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
 			sc.Properties.IsSet(RejectNestedGenerators) {
 			return NewInvalidNestedSRFError(sc.Properties.required.context)
@@ -1163,14 +1167,15 @@ func (sc *SemaContext) checkVolatility(v volatility.V) error {
 // CheckIsWindowOrAgg returns an error if the function definition is not a
 // window function or an aggregate.
 func CheckIsWindowOrAgg(def *ResolvedFunctionDefinition) error {
-	cls, err := def.GetClass()
+	hasAggregate, err := def.HasClass(AggregateClass)
 	if err != nil {
 		return err
 	}
-	switch cls {
-	case AggregateClass:
-	case WindowClass:
-	default:
+	hasWindow, err := def.HasClass(WindowClass)
+	if err != nil {
+		return err
+	}
+	if !hasAggregate && !hasWindow {
 		return pgerror.Newf(pgcode.WrongObjectType,
 			"OVER specified, but %s() is neither a window function nor an aggregate function",
 			def.Name)
@@ -1315,11 +1320,28 @@ func (expr *FuncExpr) TypeCheck(
 	// chooses the overload with preferred type for the given category. For
 	// example, float8 is the preferred type for the numeric category in Postgres.
 	// To match Postgres' behavior, we should add that logic here too.
-	funcCls, err := def.GetClass()
+
+	// fmt.Printf(">>> funcCls PREE \n",)
+	hasAggregate, err := def.HasClass(AggregateClass)
 	if err != nil {
 		return nil, err
 	}
-	if funcCls == AggregateClass {
+	hasGenerator, err := def.HasClass(GeneratorClass)
+	if err != nil {
+		return nil, err
+	}
+	hasWindow, err := def.HasClass(WindowClass)
+	if err != nil {
+		return nil, err
+	}
+	// funcCls, err := def.GetClass() // here class. can it preference to aggregate?
+	// if err != nil {
+	// 	for i := 0; i < 10; i++ {
+	// 		fmt.Printf(">>> eeeeeeeeeeeer \n")
+	// 	}
+	// 	return nil, err
+	// }
+	if hasAggregate {
 		for i := range s.typedExprs {
 			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
 				var filtered intsets.Fast
@@ -1359,7 +1381,7 @@ func (expr *FuncExpr) TypeCheck(
 			)
 		}
 		return nil, errors.WithHint(
-			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
+			pgerror.Newf(pgcode.UndefinedFunction, "z2unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
 			"No function matches the given name and argument types. You might need to add explicit type casts.",
 		)
 	}
@@ -1370,8 +1392,8 @@ func (expr *FuncExpr) TypeCheck(
 	// within a CALL statement because procedures are always called on NULL
 	// input, and because optbuilder requires a FuncExpr to remain after
 	// type-checking.
-	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && funcCls != GeneratorClass &&
-		funcCls != AggregateClass && !hasUDFOverload &&
+	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && !hasGenerator &&
+		!hasAggregate && !hasUDFOverload &&
 		semaCtx != nil && !expr.InCall {
 		for _, expr := range s.typedExprs {
 			if expr.ResolvedType().Family() == types.UnknownFamily {
@@ -1447,14 +1469,14 @@ func (expr *FuncExpr) TypeCheck(
 		}
 	} else {
 		// Make sure the window function builtins are used as window function applications.
-		if !expr.InCall && funcCls == WindowClass {
+		if !expr.InCall && hasWindow {
 			return nil, pgerror.Newf(pgcode.WrongObjectType,
 				"window function %s() requires an OVER clause", &expr.Func)
 		}
 	}
 
 	if expr.Filter != nil {
-		if funcCls != AggregateClass {
+		if !hasAggregate {
 			// Same error message as Postgres. If we have a window function, only
 			// aggregates accept a FILTER clause.
 			return nil, pgerror.Newf(pgcode.WrongObjectType,
@@ -3682,7 +3704,7 @@ func getMostSignificantOverload(
 		// This should never happen. Otherwise, it means we get function from a
 		// schema no on the given search path or we try to resolve a function on an
 		// explicit schema, but get some function from other schemas are fetched.
-		return QualifiedOverload{}, pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig())
+		return QualifiedOverload{}, pgerror.Newf(pgcode.UndefinedFunction, "z1unknown signature: %s", getFuncSig())
 	}
 	return ret, nil
 }

@@ -543,28 +543,27 @@ var aggregates = map[string]builtinDefinition{
 		makeAggOverload([]*types.T{types.String, types.AnyElement}, types.Jsonb, newJSONObjectAggregate,
 			"Aggregates values as a JSON or JSONB object.", volatility.Stable, true /* calledOnNullInput */),
 	),
-
-	"st_makeline": makeBuiltin(
-		tree.FunctionProperties{
-			AvailableOnPublicSchema: true,
-		},
-		makeAggOverload(
-			[]*types.T{types.Geometry},
-			types.Geometry,
-			func(
-				params []*types.T, evalCtx *eval.Context, arguments tree.Datums,
-			) eval.AggregateFunc {
-				return &stMakeLineAgg{
-					acc: evalCtx.Planner.Mon().MakeBoundAccount(),
-				}
-			},
-			infoBuilder{
-				info: "Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored.",
-			}.String(),
-			volatility.Immutable,
-			true, /* calledOnNullInput */
-		),
-	),
+	// "st_makeline": makeBuiltin( // here
+	// 	tree.FunctionProperties{
+	// 		AvailableOnPublicSchema: true,
+	// 	},
+	// 	makeAggOverload(
+	// 		[]*types.T{types.Geometry},
+	// 		types.Geometry,
+	// 		func(
+	// 			params []*types.T, evalCtx *eval.Context, arguments tree.Datums,
+	// 		) eval.AggregateFunc {
+	// 			return &stMakeLineAgg{
+	// 				acc: evalCtx.Planner.Mon().MakeBoundAccount(),
+	// 			}
+	// 		},
+	// 		infoBuilder{
+	// 			info: "Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored.",
+	// 		}.String(),
+	// 		volatility.Immutable,
+	// 		true, /* calledOnNullInput */
+	// 	),
+	// ),
 	"st_extent": makeBuiltin(
 		tree.FunctionProperties{
 			AvailableOnPublicSchema: true,
@@ -883,6 +882,8 @@ func (agg *stMakeLineAgg) Add(
 	if firstArg == tree.DNull {
 		return nil
 	}
+	// fmt.Printf(">>> otherArgs %v\n",len(otherArgs))
+
 	geomArg := tree.MustBeDGeometry(firstArg)
 
 	g, err := geomArg.AsGeomT()

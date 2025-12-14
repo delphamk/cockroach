@@ -7,6 +7,7 @@ package tree
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -520,16 +521,33 @@ func combineOverloads(a, b []QualifiedOverload, path SearchPath) []QualifiedOver
 // method, function is resolved to one overload, so that we can get rid of this
 // function and similar methods below.
 func (fd *ResolvedFunctionDefinition) GetClass() (FunctionClass, error) {
+
+	// this needs to change. getting the class from....
 	if fd.UnsupportedWithIssue != 0 {
 		return 0, fd.MakeUnsupportedError()
 	}
+
 	ret := fd.Overloads[0].Class
 	for i := range fd.Overloads {
 		if fd.Overloads[i].Class != ret {
-			return 0, pgerror.Newf(pgcode.AmbiguousFunction, "ambiguous function class on %s", fd.Name)
+			// for i := 0; i < 3; i++ {
+			fmt.Printf(">>> ANDREW! %v len %v CLASS %v\n", fd.Name, len(fd.Overloads), fd.Overloads[i].Class)
+			// }
+			
+			// ERRORS IF REMOVE THIS
+			return 0, pgerror.Newf(pgcode.AmbiguousFunction, "zzzambiguous function class on %s", fd.Name)
 		}
 	}
 	return ret, nil
+}
+
+func (fd *ResolvedFunctionDefinition) HasClass(fc FunctionClass) (bool, error) {
+	for i := range fd.Overloads {
+		if fd.Overloads[i].Class == fc {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // GetReturnLabel returns function ReturnLabel by checking each overload and
