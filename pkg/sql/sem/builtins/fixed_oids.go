@@ -276,7 +276,6 @@ var builtinOidsArray = []string{
 	251:  `jsonb_agg(arg1: anyelement) -> jsonb`,
 	252:  `json_object_agg(arg1: string, arg2: anyelement) -> jsonb`,
 	253:  `jsonb_object_agg(arg1: string, arg2: anyelement) -> jsonb`,
-	254:  `st_makeline(arg1: geometry) -> geometry`,
 	255:  `st_extent(arg1: geometry) -> box2d`,
 	256:  `st_union(arg1: geometry) -> geometry`,
 	257:  `st_memunion(arg1: geometry) -> geometry`,
@@ -2863,6 +2862,10 @@ var builtinOidsArray = []string{
 	2908: `crdb_internal.inject_hint(statement_fingerprint: string, donor_sql: string) -> int`,
 	2909: `crdb_internal.clear_statement_hints_cache() -> void`,
 	2910: `crdb_internal.await_statement_hints_cache() -> void`,
+
+	254:  `st_makeline(arg1: geometry) -> geometry`, // here
+	2911: `st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry`, // here
+	// 2912: `st_makeline(geometry: geometry) -> geometry`, // here
 }
 
 var builtinOidsBySignature map[string]oid.Oid

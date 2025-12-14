@@ -558,7 +558,7 @@ func makeFunc(s *Smither, ctx Context, typ *types.T, refs colRefs) (tree.TypedEx
 		}
 	}
 
-	funcExpr := tree.NewTypedFuncExpr(
+	funcExpr := tree.NewTypedFuncExpr( // ignore this one
 		tree.ResolvableFunctionReference{FunctionReference: fn.def},
 		0, /* aggQualifier */
 		args,

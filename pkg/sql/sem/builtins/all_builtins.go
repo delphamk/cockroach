@@ -140,7 +140,7 @@ func registerBuiltin(
 		overload := &def.overloads[i]
 		if enforceClass {
 			if overload.Class != expectedClass {
-				panic(errors.AssertionFailedf("%s: expected to be marked with class %q, found %q",
+				panic(errors.AssertionFailedf("%s: expected to be mabrked with class %q, found %q",
 					name, expectedClass, overload.Class))
 			}
 		}

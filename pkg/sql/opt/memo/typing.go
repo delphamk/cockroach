@@ -129,6 +129,7 @@ func FindFunction(
 	e opt.ScalarExpr, name string,
 ) (props *tree.FunctionProperties, overload *tree.Overload, ok bool) {
 	props, overloads := GetBuiltinProperties(name)
+	// important
 	for o := range overloads {
 		overload = &overloads[o]
 		if overload.Types.Length() != e.ChildCount() {
@@ -165,6 +166,10 @@ func FindWindowOverload(e opt.ScalarExpr) (name string, overload *tree.Overload)
 // given aggregate function expression. It panics if no match can be found.
 func FindAggregateOverload(e opt.ScalarExpr) (name string, overload *tree.Overload) {
 	name = opt.AggregateOpReverseMap[e.Op()]
+	// for i := 0; i < 1; i++ {
+	// 	fmt.Printf(">>> name -- %v \n", name)
+	// }
+
 	_, overload, ok := FindFunction(e, name)
 	if ok {
 		return name, overload

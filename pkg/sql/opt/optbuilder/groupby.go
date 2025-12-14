@@ -158,6 +158,9 @@ func (g *groupby) findAggregate(agg aggregateInfo) *scopeColumn {
 	for i, a := range g.aggs {
 		// Find an existing aggregate that uses the same function overload.
 		if a.def.Overload == agg.def.Overload && a.distinct == agg.distinct && a.filter == agg.filter {
+			// if a.def.Overload.Class == tree.AggregateClass {
+			// 	panic("found none AggregateClass")
+			// }
 			// Now check that the arguments are identical.
 			if len(a.args) == len(agg.args) {
 				match := true
@@ -902,15 +905,15 @@ func (b *Builder) constructAggregate(name string, args []opt.ScalarExpr) opt.Sca
 }
 
 func isAggregate(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.AggregateClass)
+	return hasClass(def, tree.AggregateClass)
 }
 
 func isGenerator(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.GeneratorClass)
+	return hasClass(def, tree.GeneratorClass)
 }
 
 func isSQLFn(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.SQLClass)
+	return hasClass(def, tree.SQLClass)
 }
 
 func isClass(def *tree.ResolvedFunctionDefinition, want tree.FunctionClass) bool {
@@ -919,6 +922,15 @@ func isClass(def *tree.ResolvedFunctionDefinition, want tree.FunctionClass) bool
 		panic(err)
 	}
 	return cls == want
+}
+
+func hasClass(def *tree.ResolvedFunctionDefinition, want tree.FunctionClass) bool {
+	// return isClass(def, want)
+	ret, err := def.HasClass(want)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
 func newGroupingError(name tree.Name) error {
