@@ -2864,6 +2864,7 @@ var builtinOidsArray = []string{
 	2910: `crdb_internal.await_statement_hints_cache() -> void`,
 	254:  `st_makeline(arg1: geometry) -> geometry`, // here
 	2911: `st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry`, // here
+	2912: `st_makeline(geos: anyelement[]) -> geometry`, // here
 	// 2912: `st_makeline(geometry: geometry) -> geometry`, // here
 }
 
