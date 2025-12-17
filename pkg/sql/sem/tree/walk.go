@@ -907,22 +907,22 @@ func (expr *DOidWrapper) Walk(_ Visitor) Expr { return expr }
 func WalkExpr(v Visitor, expr Expr) (newExpr Expr, changed bool) {
 	isLine := strings.Contains(strings.ToLower(expr.String()), "line")
 	if isLine {
-		fmt.Printf(">>>WalkExpr expr %v\n", expr.String())
+		// fmt.Printf(">>>WalkExpr expr %v\n", expr.String())
 	}
 	recurse, newExpr := v.VisitPre(expr)
 
 	if isLine {
-		fmt.Printf(">>>WalkExpr recurse %v newExpr %v\n", recurse, newExpr.String())
+		// fmt.Printf(">>>WalkExpr recurse %v newExpr %v\n", recurse, newExpr.String())
 	}
 
 	if recurse {
 		newExpr = newExpr.Walk(v)
 		if isLine {
-			fmt.Printf(">>>WalkExpr recurse 1 newExpr %v\n", newExpr.String())
+			// fmt.Printf(">>>WalkExpr recurse 1 newExpr %v\n", newExpr.String())
 		}
 		newExpr = v.VisitPost(newExpr)
 		if isLine {
-			fmt.Printf(">>>WalkExpr recurse 2 newExpr %v\n", newExpr.String())
+			// fmt.Printf(">>>WalkExpr recurse 2 newExpr %v\n", newExpr.String())
 		}
 	}
 

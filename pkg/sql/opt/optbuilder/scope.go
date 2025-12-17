@@ -1093,6 +1093,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		// TODO(mgartner): At this point the the function has not been type checked
 		// and resolved to one overload yet. Consider refactoring this so that it
 		// can handle overloads with the same name.
+
+		// HOW else is Func Resolve used to determine the overload?
 		def, err := t.Func.Resolve(s.builder.ctx, semaCtx.SearchPath, semaCtx.FunctionResolver)
 		if err != nil {
 			if t.InCall && errors.Is(err, tree.ErrRoutineUndefined) {
@@ -1105,10 +1107,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if strings.EqualFold(def.Name, "st_makeline") {
-			for i := 0; i < 5; i++ {
+			for i := 0; i < 3; i++ {
 				fmt.Printf(">>>  \n")
 			}
-			fmt.Printf(">>>  len(t.Exprs) %v\n", t.Exprs)
+			fmt.Printf(">>>  LENGTH t.Exprs: %v\n", len(t.Exprs))
+			fmt.Printf(">>>  t.Exprs %v\n", t.Exprs)
 		}
 
 		if isGenerator(def) && s.replaceSRFs {
@@ -1135,26 +1138,6 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 				}
 
 				fmt.Printf(">>> t.ResolvedOverload() NULL? %v\n", t.ResolvedOverload() == nil)
-				// if t.ResolvedOverload() == nil {
-				// 	expr, err = tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
-				// 	if err != nil{
-				// 		panic(err)
-				// 	}
-				// 	fmt.Printf(">>> ResolvedOverload IS NULL try again\n")
-				// 	// break
-				// }
-				// replaceExpr := s.replaceAggregate(t, def)
-				// replaceAggregateInfo, ok := replaceExpr.(*aggregateInfo)
-				// if ok {
-				// 	if replaceAggregateInfo.ResolvedOverload().Class != tree.AggregateClass {
-				// 		fmt.Printf(">>>!!! st_makeline NOT AggregateClass. NULL? %v\n", t.ResolvedOverload() == nil)
-				// 		break
-				// 	} else {
-				// 		fmt.Printf(">>>!!! st_makeline VALID AggregateClass\n")
-				// 	}
-				// } else {
-				// 	fmt.Printf(">>>!!! st_makeline NOT A AggregateInfo??? SHOULD NOT HAPPEN\n")
-				// }
 			}
 			expr = s.replaceAggregate(t, def)
 			break
