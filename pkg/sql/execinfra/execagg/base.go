@@ -7,6 +7,7 @@ package execagg
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/execinfra/execexpr"
@@ -40,22 +41,36 @@ func getAggregateInfo(
 	}
 
 	_, builtins := builtinsregistry.GetBuiltinProperties(strings.ToLower(fn.String()))
-	for _, b := range builtins {
+	// fmt.Printf(">>> len(builtins) %v fn.String() %v\n", len(builtins), fn.String())
+	// for _, b := range builtins {
+	// 	fmt.Printf(">>> builtins %v\n",b.Info)
+	// }
+
+	for i, b := range builtins {
 		typs := b.Types.Types()
 		if len(typs) != len(paramTypes) {
+			fmt.Printf(">>> builtins continue %v len(typs) %v len(paramTypes) %v\n", b.Info, len(typs), len(paramTypes))
 			continue
 		}
 		match := true
 		for i, t := range typs {
 			if !paramTypes[i].Equivalent(t) {
 				if b.CalledOnNullInput && paramTypes[i].IsAmbiguous() {
+					fmt.Printf(">>> builtins IsAmbiguous %v\n", b.Info)
 					continue
+				}
+				if strings.Contains(strings.ToLower(b.Info), "line") { // check substring
+					fmt.Printf(">>> builtins match = false %v\n", b.Info)
 				}
 				match = false
 				break
 			}
 		}
 		if match {
+			if strings.Contains(strings.ToLower(b.Info), "line") { // check substring
+				fmt.Printf(">>> match %v len(typs) %v len(paramTypes) %v fn.String() %v b.Info %v\n", i, len(typs), len(paramTypes), fn.String(), b.Info)
+			}
+
 			// Found!
 			constructAgg := func(evalCtx *eval.Context, arguments tree.Datums) eval.AggregateFunc {
 				return b.AggregateFunc.(eval.AggregateOverload)(paramTypes, evalCtx, arguments)

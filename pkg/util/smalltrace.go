@@ -6,7 +6,10 @@
 package util
 
 import (
+	"fmt"
+	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cockroachdb/redact"
@@ -45,4 +48,25 @@ func GetSmallTrace(skip int) redact.RedactableString {
 	}
 
 	return callers.RedactableString()
+}
+
+func WriteStack(filename string) {
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0777)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	_, err = f.WriteString("\n\n")
+	if err != nil {
+		panic(err)
+	}
+	_, err = f.Write(debug.Stack())
+	if err != nil {
+		panic(err)
+	}
+	err = os.Chmod(filename, 0777)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf(">>> wrote to filename: %v\n", filename)
 }

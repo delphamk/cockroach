@@ -33,6 +33,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/storageparam"
 	"github.com/cockroachdb/cockroach/pkg/sql/storageparam/indexstorageparam"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
+	"github.com/cockroachdb/cockroach/pkg/util"
 	"github.com/cockroachdb/cockroach/pkg/util/encoding"
 	"github.com/cockroachdb/cockroach/pkg/util/errorutil/unimplemented"
 	"github.com/cockroachdb/cockroach/pkg/util/intsets"
@@ -491,6 +492,7 @@ var makeLineBuiltin builtinDefinition = makeBuiltin(
 	defProps(),
 	makelineAggregate,
 	makeline2,
+	// makelineAggregate2,
 	// makelineArray,
 )
 
@@ -498,28 +500,50 @@ var makelineAggregate tree.Overload = makeAggOverload( // st_makeline(arg1: geom
 	[]*types.T{types.Geometry},
 	types.Geometry,
 	func(params []*types.T, evalCtx *eval.Context, arguments tree.Datums) eval.AggregateFunc {
-		// panic("MAKE_LINE_ARRAY")
-		return &stMakeLineAgg{
-			acc: evalCtx.Planner.Mon().MakeBoundAccount(),
+		// panic("MAKE_LINE_AGGREGATE")
+		for i := 0; i < 5; i++ {
+			fmt.Printf(">>> MAKE_LINE_AGGREGATE_1 \n")
 		}
+
+		return &stMakeLineAgg{acc: evalCtx.Planner.Mon().MakeBoundAccount()}
 	},
-	infoBuilder{info: ""}.String(),
+	infoBuilder{info: "MAKE_LINE_AGGREGATE_1"}.String(),
+	volatility.Immutable,
+	true, /* calledOnNullInput */
+)
+var makelineAggregate2 tree.Overload = makeAggOverload( // st_makeline(arg1: geometry) -> geometry
+	[]*types.T{types.Geometry, types.Geometry},
+	types.Geometry,
+	func(params []*types.T, evalCtx *eval.Context, arguments tree.Datums) eval.AggregateFunc {
+		for i := 0; i < 5; i++ {
+			fmt.Printf(">>> MAKE_LINE_AGGREGATE_2 \n")
+		}
+		// panic("MAKE_LINE_AGGREGATE_2")
+		return &stMakeLineAgg{acc: evalCtx.Planner.Mon().MakeBoundAccount()}
+	},
+	infoBuilder{info: "MAKE_LINE_AGGREGATE_2"}.String(),
 	volatility.Immutable,
 	true, /* calledOnNullInput */
 )
 var makeline2 tree.Overload = geometryOverload2( // st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry
 	func(_ context.Context, _ *eval.Context, a *tree.DGeometry, b *tree.DGeometry) (tree.Datum, error) {
-		panic("MAKE_LINE_2_GEOS")
-		// line, err := geomfn.MakeLine(a.Geometry, b.Geometry)
-		// return &tree.DGeometry{Geometry: line}, err
+		// panic("MAKE_LINE_2_GEOS")
+		for i := 0; i < 5; i++ {
+			fmt.Printf(">>> MAKE_LINE_2_GEOS \n")
+		}
+
+		filename := "/tmp/stack/st_makeline_geos"
+		util.WriteStack(filename)
+
+		line, err := geomfn.MakeLine(a.Geometry, b.Geometry)
+		return &tree.DGeometry{Geometry: line}, err
 	},
 	types.Geometry,
 	infoBuilder{
-		info: "",
+		info: "MAKE_LINE_2_GEOS",
 	},
 	volatility.Immutable,
 )
-
 var makelineArray tree.Overload = tree.Overload{
 	Types: tree.ParamTypes{
 		{Name: "geos", Typ: types.AnyArray},
@@ -542,7 +566,7 @@ var makelineArray tree.Overload = tree.Overload{
 
 	},
 	Info: infoBuilder{
-		info: ``,
+		info: `MAKE_LINE_ARRAY`,
 	}.String(),
 	Volatility: volatility.Immutable,
 }

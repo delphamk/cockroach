@@ -905,11 +905,25 @@ func (expr *DOidWrapper) Walk(_ Visitor) Expr { return expr }
 // found by WalkStmt and subsequently traversed. See the comment below on
 // WalkStmt for details.
 func WalkExpr(v Visitor, expr Expr) (newExpr Expr, changed bool) {
+	isLine := strings.Contains(strings.ToLower(expr.String()), "line")
+	if isLine {
+		fmt.Printf(">>>WalkExpr expr %v\n", expr.String())
+	}
 	recurse, newExpr := v.VisitPre(expr)
+
+	if isLine {
+		fmt.Printf(">>>WalkExpr recurse %v newExpr %v\n", recurse, newExpr.String())
+	}
 
 	if recurse {
 		newExpr = newExpr.Walk(v)
+		if isLine {
+			fmt.Printf(">>>WalkExpr recurse 1 newExpr %v\n", newExpr.String())
+		}
 		newExpr = v.VisitPost(newExpr)
+		if isLine {
+			fmt.Printf(">>>WalkExpr recurse 2 newExpr %v\n", newExpr.String())
+		}
 	}
 
 	// We cannot use == because some Expr implementations are not comparable (e.g. DTuple)

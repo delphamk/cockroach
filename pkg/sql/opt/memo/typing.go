@@ -6,6 +6,9 @@
 package memo
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
@@ -166,9 +169,11 @@ func FindWindowOverload(e opt.ScalarExpr) (name string, overload *tree.Overload)
 // given aggregate function expression. It panics if no match can be found.
 func FindAggregateOverload(e opt.ScalarExpr) (name string, overload *tree.Overload) {
 	name = opt.AggregateOpReverseMap[e.Op()]
-	// for i := 0; i < 1; i++ {
-	// 	fmt.Printf(">>> name -- %v \n", name)
-	// }
+	for i := 0; i < 1; i++ {
+		if strings.Contains(strings.ToLower(name), "line") {
+			fmt.Printf(">>> name -- %v e.Op() %v\n", name, e.Op())
+		}
+	}
 
 	_, overload, ok := FindFunction(e, name)
 	if ok {

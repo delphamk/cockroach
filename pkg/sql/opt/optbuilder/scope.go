@@ -26,6 +26,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree/treewindow"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqlerrors"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
+	"github.com/cockroachdb/cockroach/pkg/util"
 	"github.com/cockroachdb/errors"
 	"github.com/cockroachdb/redact"
 )
@@ -1103,14 +1104,64 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
+		if strings.EqualFold(def.Name, "st_makeline") {
+			for i := 0; i < 5; i++ {
+				fmt.Printf(">>>  \n")
+			}
+			fmt.Printf(">>>  len(t.Exprs) %v\n", t.Exprs)
+		}
+
 		if isGenerator(def) && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
 			break
 		}
 
+		// tt, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.AnyElement)
+		// t, err = tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.AnyElement)
+
+		// REPLACE AGGREGATE
+		// REPLACE AGGREGATE
+		// REPLACE AGGREGATE
+		// we are not using aggregate here...
+
 		if isAggregate(def) && t.WindowDef == nil {
+			if strings.EqualFold(def.Name, "st_makeline") {
+				if true {
+					// expr, err = tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+					// if err != nil {
+					// 	panic(err)
+					// }
+					break
+				}
+
+				fmt.Printf(">>> t.ResolvedOverload() NULL? %v\n", t.ResolvedOverload() == nil)
+				// if t.ResolvedOverload() == nil {
+				// 	expr, err = tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+				// 	if err != nil{
+				// 		panic(err)
+				// 	}
+				// 	fmt.Printf(">>> ResolvedOverload IS NULL try again\n")
+				// 	// break
+				// }
+				// replaceExpr := s.replaceAggregate(t, def)
+				// replaceAggregateInfo, ok := replaceExpr.(*aggregateInfo)
+				// if ok {
+				// 	if replaceAggregateInfo.ResolvedOverload().Class != tree.AggregateClass {
+				// 		fmt.Printf(">>>!!! st_makeline NOT AggregateClass. NULL? %v\n", t.ResolvedOverload() == nil)
+				// 		break
+				// 	} else {
+				// 		fmt.Printf(">>>!!! st_makeline VALID AggregateClass\n")
+				// 	}
+				// } else {
+				// 	fmt.Printf(">>>!!! st_makeline NOT A AggregateInfo??? SHOULD NOT HAPPEN\n")
+				// }
+			}
 			expr = s.replaceAggregate(t, def)
 			break
+		}
+
+		if strings.EqualFold(def.Name, "st_makeline") {
+			fmt.Printf(">>>  CHECKING MAKE LINE\n")
 		}
 
 		if t.WindowDef != nil {
@@ -1255,6 +1306,13 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
+	if strings.Contains(strings.ToLower(def.Name), "line") {
+		fmt.Printf(">>> CALLING replaceAggregate!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n")
+		defer fmt.Printf(">>> 					CLOSING replaceAggregate!!!!!\n")
+		filename := "/tmp/stack/st_makeline_replaceAggregate"
+		util.WriteStack(filename)
+	}
+
 	f, def = s.replaceCount(f, def)
 
 	// We need to save and restore the previous value of the field in
@@ -1268,6 +1326,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// Make a copy of f so we can modify it if needed.
 	fCopy := *f
 	// Override ordered-set aggregates to use their impl counterparts.
+	// ignore orderedSet for now...
 	if orderedSetDef, found := isOrderedSetAggregate(def); found {
 		// Ensure that the aggregation is well formed.
 		if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
@@ -1296,6 +1355,9 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// return an appropriate error. The returned tempScope will be used for
 	// building aggregate function arguments below in buildAggregateFunction.
 	tempScope := s.startAggFunc()
+	if strings.Contains(strings.ToLower(def.Name), "line") {
+		fmt.Printf(">>>  Filter null? %v\n", f.Filter == nil)
+	}
 
 	// We need to do this check here to ensure that we check the usage of special
 	// functions with the right error message.
@@ -1311,7 +1373,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 			}
 		}()
 	}
-
+	// OVERLOAD SET HERE
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)
@@ -1319,7 +1381,12 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	if typedFunc == tree.DNull {
 		return tree.DNull
 	}
-
+	// if strings.Contains(strings.ToLower(def.Name), "line") {
+	// 	return f
+	// }
+	// if typedFunc.(*tree.FuncExpr).ResolvedOverload().Class != tree.AggregateClass {
+	// 	return f
+	// }
 	f = typedFunc.(*tree.FuncExpr)
 
 	private := memo.FunctionPrivate{
@@ -1328,7 +1395,9 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		Overload:   f.ResolvedOverload(),
 	}
 
-	return s.builder.buildAggregateFunction(f, &private, tempScope, s)
+	ret := s.builder.buildAggregateFunction(f, &private, tempScope, s)
+
+	return ret
 }
 
 func (s *scope) lookupWindowDef(name tree.Name) *tree.WindowDef {

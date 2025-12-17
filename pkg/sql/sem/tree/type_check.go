@@ -16,6 +16,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree/treecmp"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/volatility"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
+	"github.com/cockroachdb/cockroach/pkg/util"
 	"github.com/cockroachdb/cockroach/pkg/util/buildutil"
 	"github.com/cockroachdb/cockroach/pkg/util/collatedstring"
 	"github.com/cockroachdb/cockroach/pkg/util/duration"
@@ -358,7 +359,7 @@ func decorateTypeCheckError(err error, format string, a ...interface{}) error {
 // desired.
 func TypeCheck(
 	ctx context.Context, expr Expr, semaCtx *SemaContext, desired *types.T,
-) (TypedExpr, error) {
+) (TypedExpr, error) {	// OVERLOAD SET HERE
 	if desired == nil {
 		return nil, errors.AssertionFailedf(
 			"the desired type for tree.TypeCheck cannot be nil, use types.AnyElement instead: %T", expr)
@@ -1037,7 +1038,7 @@ var (
 // NewAggInAggError creates an error for the case when an aggregate function is
 // contained within another aggregate function.
 func NewAggInAggError() error {
-	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nested")
+	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nested1")
 }
 
 // NewInvalidNestedSRFError creates a rejection for a nested SRF.
@@ -1199,7 +1200,7 @@ func (expr *FuncExpr) typeCheckWithFuncAncestor(semaCtx *SemaContext, fn func() 
 }
 
 // TypeCheck implements the Expr interface.
-func (expr *FuncExpr) TypeCheck(
+func (expr *FuncExpr) TypeCheck( // may return favoured
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
 	if semaCtx != nil && semaCtx.Properties.RoutineUseResolvedType &&
@@ -1217,9 +1218,7 @@ func (expr *FuncExpr) TypeCheck(
 		}
 		resolver = semaCtx.FunctionResolver
 	}
-
 	_, functionResolvedByID := expr.Func.FunctionReference.(*FunctionOID)
-
 	def, err := expr.Func.Resolve(ctx, searchPath, resolver)
 	if err != nil {
 		if errors.Is(err, ErrRoutineUndefined) && expr.InCall {
@@ -1334,13 +1333,6 @@ func (expr *FuncExpr) TypeCheck(
 	if err != nil {
 		return nil, err
 	}
-	// funcCls, err := def.GetClass() // here class. can it preference to aggregate?
-	// if err != nil {
-	// 	for i := 0; i < 10; i++ {
-	// 		fmt.Printf(">>> eeeeeeeeeeeer \n")
-	// 	}
-	// 	return nil, err
-	// }
 	if hasAggregate {
 		for i := range s.typedExprs {
 			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
@@ -1421,6 +1413,7 @@ func (expr *FuncExpr) TypeCheck(
 
 	// Just pick the first overload from the search path.
 	overloadImpl := favoredOverload.Overload
+	// fmt.Printf(">>> 11 TYPECHECK favoredOverload.Info %v functionResolvedByID %v\n", overloadImpl.Info, functionResolvedByID)
 	if overloadImpl.Private {
 		return nil, pgerror.Wrapf(errPrivateFunction, pgcode.ReservedName,
 			"%s()", errors.Safe(def.Name))
@@ -1516,8 +1509,15 @@ func (expr *FuncExpr) TypeCheck(
 
 	expr.Func.FunctionReference = def
 	expr.fn = overloadImpl
+	if strings.Contains(strings.ToLower(overloadImpl.Info), "line") {
+		fmt.Printf(">>> TypeCheck set setOverload: %v\n", overloadImpl.Info)
+		filename := "/tmp/stack/st_makeline_setOverload"
+		util.WriteStack(filename)
+	}
+
 	expr.fnProps = &overloadImpl.FunctionProperties
 	expr.typ = overloadImpl.returnType()(s.typedExprs)
+
 	if expr.typ == UnknownReturnType {
 		typeNames := make([]string, 0, len(expr.Exprs))
 		for _, expr := range s.typedExprs {
@@ -1535,6 +1535,12 @@ func (expr *FuncExpr) TypeCheck(
 	}
 	if overloadImpl.OnTypeCheck != nil {
 		overloadImpl.OnTypeCheck()
+	}
+
+	if strings.HasPrefix(expr.ResolvedOverload().Info, "MAKE_LINE") {
+		for i := 0; i < 1; i++ {
+			fmt.Printf(">>> TypeCheck ret expr: %v class: %v\n", expr.ResolvedOverload().Info, expr.ResolvedOverload().Class)
+		}
 	}
 	return expr, nil
 }

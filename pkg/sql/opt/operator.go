@@ -227,6 +227,7 @@ var AggregateOpReverseMap = map[Operator]string{
 	VarPopOp:                      "var_pop",
 	StdDevPopOp:                   "stddev_pop",
 	STMakeLineOp:                  "st_makeline",
+	STMakeLineTwoOp:               "st_makeline",
 	STUnionOp:                     "st_union",
 	STCollectOp:                   "st_collect",
 	STExtentOp:                    "st_extent",

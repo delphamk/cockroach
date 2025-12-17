@@ -900,6 +900,8 @@ func (agg *stMakeLineAgg) Add(
 			agg.layout,
 		)
 	}
+	fmt.Printf(">>> stMakeLineAgg ADD()\n")
+
 	switch g.(type) {
 	case *geom.Point, *geom.LineString, *geom.MultiPoint:
 		return agg.appendFlatCoords(ctx, g)
@@ -942,6 +944,10 @@ func (agg *stMakeLineAgg) Result() (tree.Datum, error) {
 	// It is the caller's responsibility to account for the returned DGeometry,
 	// so we can now shrink the memory account back.
 	agg.acc.Shrink(ctx, usedMem)
+	fmt.Printf(">>> stMakeLineAgg RESULT()\n")
+	filename := "/tmp/stack/st_makeline_result"
+	util.WriteStack(filename)
+
 	return tree.NewDGeometry(g), nil
 }
 

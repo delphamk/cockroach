@@ -32,6 +32,9 @@ package optbuilder
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
+	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/cat"
@@ -40,6 +43,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
+	"github.com/cockroachdb/cockroach/pkg/util"
 	"github.com/cockroachdb/errors"
 )
 
@@ -158,9 +162,12 @@ func (g *groupby) findAggregate(agg aggregateInfo) *scopeColumn {
 	for i, a := range g.aggs {
 		// Find an existing aggregate that uses the same function overload.
 		if a.def.Overload == agg.def.Overload && a.distinct == agg.distinct && a.filter == agg.filter {
-			// if a.def.Overload.Class == tree.AggregateClass {
-			// 	panic("found none AggregateClass")
-			// }
+			if a.def.Overload.Class != tree.AggregateClass {
+				for x := 0; x < 3; x++ {
+					fmt.Printf(">>> ___________ skipping none aggregate %v\n", a.def.Overload.Info)
+				}
+				continue
+			}
 			// Now check that the arguments are identical.
 			if len(a.args) == len(agg.args) {
 				match := true
@@ -186,6 +193,11 @@ func (g *groupby) findAggregate(agg aggregateInfo) *scopeColumn {
 				}
 
 				if match {
+					if a.def.Overload.Class != tree.AggregateClass {
+						for x := 0; x < 3; x++ {
+							fmt.Printf(">>> ___________ match is not aggregate %v\n", a.def.Overload.Info)
+						}
+					}
 					// Aggregate already exists, so return information about the
 					// existing column that computes it.
 					return &g.aggregateResultCols()[i]
@@ -338,7 +350,7 @@ func (b *Builder) buildGroupingColumns(sel *tree.SelectClause, projectionsScope,
 
 // buildAggregation builds the aggregation operators and constructs the
 // GroupBy expression. Returns the output scope for the aggregation operation.
-func (b *Builder) buildAggregation(having opt.ScalarExpr, fromScope *scope) (outScope *scope) {
+func (b *Builder) buildAggregation(having opt.ScalarExpr, fromScope *scope) (outScope *scope) { // calls the aggregate constructor
 	g := fromScope.groupby
 
 	groupingCols := g.groupingCols()
@@ -696,6 +708,9 @@ func (b *Builder) buildAggregateFunction(
 	f *tree.FuncExpr, def *memo.FunctionPrivate, tempScope, fromScope *scope,
 ) *aggregateInfo {
 	tempScopeColsBefore := len(tempScope.cols)
+	if strings.Contains(strings.ToLower(def.Name), "line") {
+		fmt.Printf(">>> !!!! buildAggregateFunction def.name %v\n", def.Name)
+	}
 
 	info := aggregateInfo{
 		FuncExpr: f,
@@ -769,6 +784,12 @@ func (b *Builder) buildAggregateFunction(
 		// Undo the adding of the args.
 		// TODO(radu): is there a cleaner way to do this?
 		tempScope.cols = tempScope.cols[:tempScopeColsBefore]
+	}
+
+	if info.ResolvedOverload() != nil {
+		if strings.Contains(strings.ToLower(info.ResolvedOverload().Info), "line") {
+			fmt.Printf(">>> !!!! buildAggregateFunction %v\n", info.ResolvedOverload().Info)
+		}
 	}
 
 	return &info
@@ -868,6 +889,15 @@ func (b *Builder) constructAggregate(name string, args []opt.ScalarExpr) opt.Sca
 	case "var_pop":
 		return b.factory.ConstructVarPop(args[0])
 	case "st_makeline":
+		fmt.Printf(">>> ConstructSTMakeLine st_makeline len: %v\n", len(args))
+		if len(args) == 2 {
+			// panic("SHOULD ONLY HAVE 1 ARG")
+			fmt.Printf(">>> stackz:  %s\n", debug.Stack())
+			filename := "/tmp/stack/st_makeline_agg"
+			util.WriteStack(filename)
+
+			return b.factory.ConstructSTMakeLineTwo(args[0], args[1])
+		}
 		return b.factory.ConstructSTMakeLine(args[0])
 	case "st_collect", "st_memcollect":
 		return b.factory.ConstructSTCollect(args[0])

@@ -865,6 +865,15 @@ func createAndStartServerAsync(
 			if err := s.AcceptInternalClients(ctx); err != nil {
 				return err
 			}
+			for i := 0; i < 3; i++ {
+					fmt.Printf(">>>  \n")
+			}
+			for i := 0; i < 3; i++ {
+				fmt.Printf(">>> starting server \n")
+			}
+			for i := 0; i < 3; i++ {
+					fmt.Printf(">>>  \n")
+			}
 
 			// Run one-off cluster initialization.
 			if err := s.RunInitialSQL(ctx, startSingleNode, "" /* adminUser */, "" /* adminPassword */); err != nil {

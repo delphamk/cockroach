@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/lex"
 	"github.com/cockroachdb/cockroach/pkg/sql/oidext"
@@ -18,6 +19,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree/treebin"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree/treecmp"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
+	"github.com/cockroachdb/cockroach/pkg/util"
 	"github.com/cockroachdb/cockroach/pkg/util/buildutil"
 	"github.com/cockroachdb/cockroach/pkg/util/iterutil"
 	"github.com/cockroachdb/errors"
@@ -1291,6 +1293,13 @@ func NewTypedFuncExpr(
 	props *FunctionProperties,
 	overload *Overload,
 ) *FuncExpr {
+	if strings.Contains(strings.ToLower(overload.Info), "line") {
+		fmt.Printf(">>> NewTypedFuncExpr overload.Info: %v\n", overload.Info)
+		filename := "/tmp/stack/st_makeline_newTypedFuncExpr"
+		util.WriteStack(filename)
+
+	}
+
 	f := &FuncExpr{
 		Func:           ref,
 		Type:           aggQualifier,

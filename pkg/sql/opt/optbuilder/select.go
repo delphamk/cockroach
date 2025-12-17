@@ -8,6 +8,7 @@ package optbuilder
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/server/telemetry"
 	"github.com/cockroachdb/cockroach/pkg/sql/catalog/catpb"
@@ -1244,6 +1245,11 @@ func (b *Builder) buildSelectClause(
 
 	var having opt.ScalarExpr
 	needsAgg := b.needsAggregation(sel, fromScope)
+
+	if strings.Contains(strings.ToLower(sel.String()), "line") {
+		fmt.Printf(">>> needsAgg %v\n", needsAgg)
+	}
+
 	if needsAgg {
 		// Grouping columns must be built before building the projection list so
 		// we can check that any column references that appear in the SELECT list

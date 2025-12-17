@@ -1018,6 +1018,14 @@ define STMakeLine {
 }
 
 [Scalar, Aggregate]
+define STMakeLineTwo {
+    Input ScalarExpr
+    Input2 ScalarExpr
+}
+
+
+
+[Scalar, Aggregate]
 define STExtent {
     Input ScalarExpr
 }
