@@ -8,6 +8,7 @@ package tree
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -1037,11 +1038,21 @@ var (
 // NewAggInAggError creates an error for the case when an aggregate function is
 // contained within another aggregate function.
 func NewAggInAggError() error {
+
+	stack := debug.Stack()
+	if true {
+		fmt.Printf("\n\n andrew Stack trace nestedz:\n%s\n\n", stack)
+	}
 	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nested")
 }
 
 // NewInvalidNestedSRFError creates a rejection for a nested SRF.
 func NewInvalidNestedSRFError(context string) error {
+
+	stack := debug.Stack()
+	if false {
+		fmt.Printf("\n\n andrew Stack trace top-level:\n%s\n\n", stack)
+	}
 	return pgerror.Newf(pgcode.FeatureNotSupported,
 		"set-returning functions must appear at the top level of %s", context)
 }
@@ -1061,6 +1072,13 @@ func NewInvalidFunctionUsageError(class FunctionClass, context string) error {
 		cat = "set-returning"
 		code = pgcode.FeatureNotSupported
 	}
+	fmt.Printf(">>> andrew!!! %s functions are not allowed in %s\n", cat, context)
+
+	stack := debug.Stack()
+	if false {
+		fmt.Printf("\n\n andrew Stack trace:\n%s\n\n", stack)
+	}
+
 	return pgerror.Newf(code, "%s functions are not allowed in %s", cat, context)
 }
 
@@ -1099,7 +1117,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 				return NewAggInAggError()
 			}
 			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context) // agg
 			}
 			sc.Properties.Derived.SeenAggregate = true
 		}
@@ -1110,7 +1128,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 			return NewInvalidNestedSRFError(sc.Properties.required.context)
 		}
 		if sc.Properties.IsSet(RejectGenerators) {
-			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context)
+			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context) // gen
 		}
 		if sc.Properties.Ancestors.Has(ConditionalAncestor) {
 			return NewInvalidFunctionUsageError(GeneratorClass, "conditional expressions")
@@ -1191,6 +1209,214 @@ func (expr *FuncExpr) typeCheckWithFuncAncestor(semaCtx *SemaContext, fn func() 
 		semaCtx.Properties.Reject(RejectProcedures)
 	}
 	return fn()
+}
+
+func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, def *ResolvedFunctionDefinition, desired *types.T) (*QualifiedOverload, error) {
+
+	// if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+	// 		"%s()", def.Name)
+	// }
+
+	s := getOverloadTypeChecker(
+		(*qualifiedOverloads)(&def.Overloads), expr.Exprs...,
+	)
+	defer s.release()
+	var err error
+
+	typeCheckFunc := func() error {
+		if err := s.typeCheckOverloadedExprs(ctx, semaCtx, desired, false /* inBinOp */); err != nil {
+			return pgerror.Wrapf(err, pgcode.InvalidParameterValue, "%s()", def.Name)
+		}
+		if expr.InCall && len(s.overloadIdxs) == 0 {
+			// Since we didn't find the overload, let's see whether the user
+			// made a mistake and attempted to call a UDF. We attempt this by
+			// temporarily adjusting the RoutineType of each UDF to be
+			// Procedure, then running type-checking on adjusted overloads, and
+			// resetting the UDF overloads to their original state.
+			var functionIdxs []int
+			var functionOverloads []QualifiedOverload
+			for idx, o := range def.Overloads {
+				if o.Type == UDFRoutine {
+					o.Type = ProcedureRoutine
+					functionIdxs = append(functionIdxs, idx)
+					functionOverloads = append(functionOverloads, o)
+				}
+			}
+			if len(functionIdxs) > 0 {
+				defer func() {
+					for _, idx := range functionIdxs {
+						def.Overloads[idx].Type = UDFRoutine
+					}
+				}()
+				s2 := getOverloadTypeChecker((*qualifiedOverloads)(&functionOverloads), expr.Exprs...)
+				defer s2.release()
+				err2 := s2.typeCheckOverloadedExprs(ctx, semaCtx, desired, false /* inBinOp */)
+				if err2 == nil && len(s2.overloadIdxs) > 0 {
+					// This time we found a match, so return the proper error.
+					return errors.WithHint(
+						pgerror.Newf(
+							pgcode.WrongObjectType,
+							"%sis not a procedure", def.Name,
+						),
+						"To call a function, use SELECT.",
+					)
+				}
+			}
+		}
+		return nil
+	}
+	err = typeCheckFunc()
+
+	// err = expr.typeCheckWithFuncAncestor(semaCtx, typeCheckFunc)
+	if err != nil {
+		return nil, err
+	}
+
+	_, functionResolvedByID := expr.Func.FunctionReference.(*FunctionOID)
+
+	var hasUDFOverload bool
+	var calledOnNullInputFns, notCalledOnNullInputFns intsets.Fast
+	for _, idx := range s.overloadIdxs {
+		if def.Overloads[idx].CalledOnNullInput {
+			calledOnNullInputFns.Add(int(idx))
+		} else {
+			notCalledOnNullInputFns.Add(int(idx))
+		}
+		// TODO(harding): Check if this is a record-returning UDF instead.
+		if def.Overloads[idx].Type == UDFRoutine {
+			hasUDFOverload = true
+		}
+	}
+
+	// If the function is an aggregate that does not accept null arguments and we
+	// have arguments of unknown type, see if we can assign type string instead.
+	// TODO(rytaft): If there are no overloads with string inputs, Postgres
+	// chooses the overload with preferred type for the given category. For
+	// example, float8 is the preferred type for the numeric category in Postgres.
+	// To match Postgres' behavior, we should add that logic here too.
+	funcCls, err := def.GetClass()
+	if err != nil {
+		return nil, err
+	}
+	if funcCls == AggregateClass {
+		for i := range s.typedExprs {
+			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
+				var filtered intsets.Fast
+				for j, ok := notCalledOnNullInputFns.Next(0); ok; j, ok = notCalledOnNullInputFns.Next(j + 1) {
+					if def.Overloads[j].params().GetAt(i).Equivalent(types.String) {
+						filtered.Add(j)
+					}
+				}
+
+				// Only use the filtered list if it's not empty.
+				if filtered.Len() > 0 {
+					notCalledOnNullInputFns = filtered
+
+					// Cast the expression to a string so the execution engine will find
+					// the correct overload.
+					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String)
+				}
+			}
+		}
+		truncated := s.overloadIdxs[:0]
+		for _, idx := range s.overloadIdxs {
+			if calledOnNullInputFns.Contains(int(idx)) ||
+				notCalledOnNullInputFns.Contains(int(idx)) {
+				truncated = append(truncated, idx)
+			}
+		}
+		s.overloadIdxs = truncated
+	}
+
+	if len(s.overloadIdxs) == 0 {
+		if expr.InCall {
+			return nil, errors.WithHint(
+				pgerror.Newf(pgcode.UndefinedFunction, "procedure %s does not exist",
+					def.Name),
+				"No procedure matches the given name and argument types. "+
+					"You might need to add explicit type casts.",
+			)
+		}
+		return nil, errors.WithHint(
+			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
+			"No function matches the given name and argument types. You might need to add explicit type casts.",
+		)
+	}
+
+	// Return NULL if at least one overload is possible, no overload accepts
+	// NULL arguments, the function isn't a generator or aggregate builtin, and
+	// NULL is given as an argument. We do not perform this transformation
+	// within a CALL statement because procedures are always called on NULL
+	// input, and because optbuilder requires a FuncExpr to remain after
+	// type-checking.
+	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && funcCls != GeneratorClass &&
+		funcCls != AggregateClass && !hasUDFOverload &&
+		semaCtx != nil && !expr.InCall {
+		for _, expr := range s.typedExprs {
+			if expr.ResolvedType().Family() == types.UnknownFamily {
+				return nil, nil
+				// panic("temp")
+			}
+		}
+	}
+
+	var favoredOverload QualifiedOverload
+	if functionResolvedByID {
+		// If the function is resolved by OID, we know that there is always only one
+		// overload qualified. As long as it passes the argument type checks above,
+		// there is no need to worry about the search path.
+		favoredOverload = def.Overloads[0]
+	} else {
+		// Get overloads from the most significant schema in search path.
+		favoredOverload, err = getMostSignificantOverload(
+			def.Overloads, s.overloads, s.overloadIdxs, semaCtx.SearchPath, expr, s.typedExprs,
+			func() string { return getFuncSig(expr, s.typedExprs, desired) },
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Just pick the first overload from the search path.
+	overloadImpl := favoredOverload.Overload
+	if overloadImpl.Private {
+		return nil, pgerror.Wrapf(errPrivateFunction, pgcode.ReservedName,
+			"%s()", errors.Safe(def.Name))
+	}
+	if semaCtx.FunctionResolver != nil && overloadImpl.UDFContainsOnlySignature {
+		_, overloadImpl, err = semaCtx.FunctionResolver.ResolveFunctionByOID(ctx, overloadImpl.Oid)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Some builtins are disabled in certain contexts for Postgres compatibility.
+	if overloadImpl.Type == BuiltinRoutine {
+		switch def.Name {
+		case "min", "max":
+			// Special case: for REFCURSOR, we disallow min/max during type-checking
+			// despite having overloads for REFCURSOR. This maintains compatibility
+			// with postgres without having to add special checks in optimizer rules
+			// for REFCURSOR.
+			if len(s.typedExprs) > 0 && s.typedExprs[0].ResolvedType().Family() == types.RefCursorFamily {
+				return nil, pgerror.Newf(pgcode.UndefinedFunction, "function %s(refcursor) does not exist", def.Name)
+			}
+		}
+	}
+
+	if overloadImpl.Type == ProcedureRoutine && semaCtx.Properties.IsSet(RejectProcedures) {
+		return nil, errors.WithHint(
+			pgerror.Newf(
+				pgcode.WrongObjectType,
+				"%s(%s) is a procedure", def.Name, overloadImpl.Types.String(),
+			),
+			"To call a procedure, use CALL.",
+		)
+	}
+
+	return &favoredOverload, nil
+
 }
 
 // TypeCheck implements the Expr interface.

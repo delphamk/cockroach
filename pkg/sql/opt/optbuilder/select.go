@@ -1252,7 +1252,7 @@ func (b *Builder) buildSelectClause(
 		having = b.buildHaving(havingExpr, fromScope)
 	}
 
-	b.buildProjectionList(fromScope, projectionsScope, nil /* colRefs */)
+	b.buildProjectionList(fromScope, projectionsScope, nil /* colRefs */) // normal fucntion
 	b.buildOrderBy(fromScope, projectionsScope, orderByScope)
 	b.buildDistinctOnArgs(fromScope, projectionsScope, distinctOnScope)
 	b.buildLockArgs(fromScope, projectionsScope, lockScope)
@@ -1262,7 +1262,7 @@ func (b *Builder) buildSelectClause(
 		// We must wait to build the aggregation until after the above block since
 		// any SRFs found in the SELECT list will change the FROM scope (they
 		// create an implicit lateral join).
-		outScope = b.buildAggregation(having, fromScope)
+		outScope = b.buildAggregation(having, fromScope) // agg fucntion
 	} else {
 		outScope = fromScope
 	}
