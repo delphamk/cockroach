@@ -1109,66 +1109,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			}
 			panic(err)
 		}
-		expr = t.Walk(s)
-		t = expr.(*tree.FuncExpr)
 
-		t, def = s.replaceCount(t, def)
-
-		fCopy := t
-		if orderedSetDef, found := isOrderedSetAggregate(def); found {
-
-			// Ensure that the aggregation is well formed.
-			if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
-				panic(pgerror.Newf(
-					pgcode.InvalidFunctionDefinition,
-					"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
-			}
-
-			// Override function definition.
-			def = orderedSetDef
-			fCopy.Func.FunctionReference = orderedSetDef
-
-			// Copy Exprs slice.
-			oldExprs := t.Exprs
-			fCopy.Exprs = make(tree.Exprs, len(oldExprs))
-			copy(fCopy.Exprs, oldExprs)
-
-			// Add implicit column to the input expressions.
-			fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
-
-			expr = fCopy.Walk(s)
-		}
-
-		func() {
-			// defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
-
-			// s.builder.semaCtx.Properties.Require("aggregate",
-			// 	tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
-
-			print := false
-			print = true
-			overload, err := t.OverLoadCheck(s.builder.ctx, semaCtx, def, types.AnyElement)
-			if err != nil {
-				if print {
-					fmt.Printf(">>> andrew1 err %q\n", err)
-				}
-
-				stack := debug.Stack()
-				if false {
-					fmt.Printf("\n\n andrew1 Stack trace:\n%s\n\n", stack)
-				}
-				panic(err)
-				// break
-			} else {
-				oString := "nil"
-				if overload != nil {
-					oString = overload.Class.String()
-				}
-				if print {
-					fmt.Printf(">>> andrew2 overload is %s\n", oString)
-				}
-			}
-		}()
+		expr, t, def = s.handleFuncExpr(expr, t, def)
 
 		if isGenerator(def) && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
@@ -1729,63 +1671,85 @@ func (s *scope) replaceSubquery(
 	}
 }
 
-func (s *scope) handleFuncExpr(expr tree.Expr) tree.Expr {
-	switch t := expr.(type) {
-	case *tree.FuncExpr:
-		semaCtx := s.builder.semaCtx
-		expr = t.Walk(s)
-		// TODO(mgartner): At this point the the function has not been type checked
-		// and resolved to one overload yet. Consider refactoring this so that it
-		// can handle overloads with the same name.
-		def, err := t.Func.Resolve(s.builder.ctx, semaCtx.SearchPath, semaCtx.FunctionResolver)
-		if err != nil {
-			if t.InCall && errors.Is(err, tree.ErrRoutineUndefined) {
-				panic(errors.WithHint(
-					pgerror.Newf(pgcode.UndefinedFunction, "procedure %s does not exist", t.Func),
-					"No procedure matches the given name.",
-				))
-			}
-			panic(err)
+func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) (tree.Expr, *tree.FuncExpr, *tree.ResolvedFunctionDefinition) {
+
+	semaCtx := s.builder.semaCtx
+	// expr = t.Walk(s)
+	// TODO(mgartner): At this point the the function has not been type checked
+	// and resolved to one overload yet. Consider refactoring this so that it
+	// can handle overloads with the same name.
+	// def, err := t.Func.Resolve(s.builder.ctx, semaCtx.SearchPath, semaCtx.FunctionResolver)
+	// if err != nil {
+	// 	if t.InCall && errors.Is(err, tree.ErrRoutineUndefined) {
+	// 		panic(errors.WithHint(
+	// 			pgerror.Newf(pgcode.UndefinedFunction, "procedure %s does not exist", t.Func),
+	// 			"No procedure matches the given name.",
+	// 		))
+	// 	}
+	// 	panic(err)
+	// }
+
+	expr = t.Walk(s)
+	t = expr.(*tree.FuncExpr)
+
+	t, def = s.replaceCount(t, def)
+
+	fCopy := t
+	if orderedSetDef, found := isOrderedSetAggregate(def); found {
+
+		// Ensure that the aggregation is well formed.
+		if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
+			panic(pgerror.Newf(
+				pgcode.InvalidFunctionDefinition,
+				"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
 		}
 
-		t, def = s.replaceCount(t, def)
+		// Override function definition.
+		def = orderedSetDef
+		fCopy.Func.FunctionReference = orderedSetDef
 
+		// Copy Exprs slice.
+		oldExprs := t.Exprs
+		fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+		copy(fCopy.Exprs, oldExprs)
+
+		// Add implicit column to the input expressions.
+		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
+
+		expr = fCopy.Walk(s)
+	}
+
+	func() {
+		// defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+
+		// s.builder.semaCtx.Properties.Require("aggregate",
+		// 	tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
+
+		print := false
+		print = true
 		overload, err := t.OverLoadCheck(s.builder.ctx, semaCtx, def, types.AnyElement)
 		if err != nil {
-			fmt.Printf(">>> andrew1 err %q\n", err)
-			break
-		}
+			if print {
+				fmt.Printf(">>> andrew1 err %q\n", err)
+			}
 
-		if overload == nil {
-			fmt.Printf(">>> andrew2 overload is nil\n")
+			stack := debug.Stack()
+			if false {
+				fmt.Printf("\n\n andrew1 Stack trace:\n%s\n\n", stack)
+			}
+			panic(err)
+			// break
 		} else {
-			fmt.Printf(">>> andrew2 overload is %s\n", overload.Class.String())
+			oString := "nil"
+			if overload != nil {
+				oString = overload.Class.String()
+			}
+			if print {
+				fmt.Printf(">>> andrew2 overload is %s\n", oString)
+			}
 		}
-
-		// if isGenerator(def) && s.replaceSRFs {
-		if overload != nil && overload.Class == tree.GeneratorClass && s.replaceSRFs {
-			expr = s.replaceSRF(t, def)
-			break
-		}
-		if overload != nil && overload.Class == tree.AggregateClass && t.WindowDef == nil {
-			// }
-			// if isAggregate(def) && t.WindowDef == nil {
-			expr = s.replaceAggregate(t, def)
-			break
-		}
-
-		if t.WindowDef != nil {
-			expr = s.replaceWindowFn(t, def)
-			break
-		}
-
-		// if isSQLFn(def) {
-		if overload != nil && overload.Class == tree.SQLClass {
-			expr = s.replaceSQLFn(t, def)
-			break
-		}
-	}
-	return expr
+	}()
+	return expr, t, def
 }
 
 // VisitPost is part of the Visitor interface.
