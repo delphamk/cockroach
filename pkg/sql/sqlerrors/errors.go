@@ -502,7 +502,7 @@ func NewWindowInAggError() error {
 func NewAggInAggError() error {
 
 	stack := debug.Stack()
-	if true {
+	if false {
 		fmt.Printf("\n\n andrew NewAggInAggError:\n%s\n\n", stack)
 	}
 	return pgerror.New(pgcode.Grouping, "aggregate function calls cannot be nested")

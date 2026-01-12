@@ -713,7 +713,13 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 	}
 	s.inAgg = false
 
+	count := 0
 	for curr := s; curr != nil; curr = curr.parent {
+		fmt.Printf("---- endAggFunc (%v) LEN %v INTER %v inAgg %v\n", count, cols.Len() == 0, cols.Intersects(curr.colSet()), curr.inAgg)
+		// fmt.Printf(">>> COL.STRING %v\n", cols.String())
+		// fmt.Printf(">>> CURR.STRING %v\n", curr.String())
+
+		count++
 		if cols.Len() == 0 || cols.Intersects(curr.colSet()) {
 			curr.verifyAggregateContext()
 			if curr.groupby == nil {
@@ -723,6 +729,11 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 		}
 	}
 
+	stack := debug.Stack()
+	if false {
+		fmt.Printf("\n\n andrew endAggFunc:\n%s\n\n", stack)
+	}
+	// panic(pgerror.New(pgcode.Grouping, "wrong error (endAggFunc)"))
 	panic(errors.AssertionFailedf("aggregate function is not allowed in this context"))
 }
 
@@ -1014,7 +1025,6 @@ func makeUntypedTuple(labels []string, texprs []tree.TypedExpr) *tree.Tuple {
 //
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
-var count = 0
 
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 	switch t := expr.(type) {
@@ -1091,14 +1101,17 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
+
+		stack := debug.Stack()
+		if false {
+			fmt.Printf("\n\n andrew PRE STACK FuncExpr:\n%s\n\n", stack)
+		}
+
+		fmt.Printf(">>> START PREEEXPR %q\n", expr.String())
+		defer fmt.Printf(">>>>>> END PREEEXPR %q\n", expr.String())
+
 		semaCtx := s.builder.semaCtx
 
-		count++
-		fmt.Printf(">>> andrew EXPR %v %q\n", count, expr.String())
-		defer fmt.Printf(">>> andrew done EXPR %v  %q\n", count, expr.String())
-		// TODO(mgartner): At this point the the function has not been type checked
-		// and resolved to one overload yet. Consider refactoring this so that it
-		// can handle overloads with the same name.
 		def, err := t.Func.Resolve(s.builder.ctx, semaCtx.SearchPath, semaCtx.FunctionResolver)
 		if err != nil {
 			if t.InCall && errors.Is(err, tree.ErrRoutineUndefined) {
@@ -1110,7 +1123,10 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
-		expr, t, def = s.handleFuncExpr(expr, t, def)
+		// fCopy := expr
+
+		s.handleFuncExpr(t, def)
+		// expr, t, def = s.handleFuncExpr(expr, t, def)
 
 		if isGenerator(def) && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
@@ -1118,6 +1134,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
+
 			expr = s.replaceAggregate(t, def)
 			break
 		}
@@ -1264,6 +1281,9 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
+	fmt.Printf(">>> START REPLACE_ARGG %q\n", f.String())
+	defer fmt.Printf(">>>>>> END REPLACE_ARGG %q\n", f.String())
+
 	f, def = s.replaceCount(f, def)
 
 	// We need to save and restore the previous value of the field in
@@ -1671,7 +1691,12 @@ func (s *scope) replaceSubquery(
 	}
 }
 
-func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) (tree.Expr, *tree.FuncExpr, *tree.ResolvedFunctionDefinition) {
+func (s *scope) handleFuncExpr(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) {
+	fmt.Printf(">>> START handleFuncExpr %q\n", f.String())
+	defer fmt.Printf(">>>>>> END handleFuncExpr %q\n", f.String())
+	// I dont want to modify the expression.
+
+	defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 	semaCtx := s.builder.semaCtx
 	// expr = t.Walk(s)
@@ -1689,16 +1714,16 @@ func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.Resol
 	// 	panic(err)
 	// }
 
-	expr = t.Walk(s)
-	t = expr.(*tree.FuncExpr)
+	fCopy := *f
 
-	t, def = s.replaceCount(t, def)
+	// oldExprs := f.Exprs
+	// fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+	// copy(fCopy.Exprs, oldExprs)
 
-	fCopy := t
 	if orderedSetDef, found := isOrderedSetAggregate(def); found {
 
 		// Ensure that the aggregation is well formed.
-		if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
+		if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
 			panic(pgerror.Newf(
 				pgcode.InvalidFunctionDefinition,
 				"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
@@ -1709,15 +1734,20 @@ func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.Resol
 		fCopy.Func.FunctionReference = orderedSetDef
 
 		// Copy Exprs slice.
-		oldExprs := t.Exprs
+		oldExprs := f.Exprs
 		fCopy.Exprs = make(tree.Exprs, len(oldExprs))
 		copy(fCopy.Exprs, oldExprs)
 
 		// Add implicit column to the input expressions.
 		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
 
-		expr = fCopy.Walk(s)
 	}
+
+	expr := (fCopy.Walk(s)).(*tree.FuncExpr)
+
+	expr, def = s.replaceCount(expr, def)
+
+	// t := f
 
 	func() {
 		// defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
@@ -1727,10 +1757,10 @@ func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.Resol
 
 		print := false
 		print = true
-		overload, err := t.OverLoadCheck(s.builder.ctx, semaCtx, def, types.AnyElement)
+		overload, err := expr.OverLoadCheck(s.builder.ctx, semaCtx, def, types.AnyElement)
 		if err != nil {
 			if print {
-				fmt.Printf(">>> andrew1 err %q\n", err)
+				fmt.Printf("--- andrew1 err %q\n", err)
 			}
 
 			stack := debug.Stack()
@@ -1745,16 +1775,22 @@ func (s *scope) handleFuncExpr(expr tree.Expr, t *tree.FuncExpr, def *tree.Resol
 				oString = overload.Class.String()
 			}
 			if print {
-				fmt.Printf(">>> andrew2 overload is %s\n", oString)
+				fmt.Printf("---- andrew2 overload is %s\n", oString)
 			}
 		}
 	}()
-	return expr, t, def
+
+	return
 }
 
 // VisitPost is part of the Visitor interface.
 func (s *scope) VisitPost(expr tree.Expr) tree.Expr {
-	// expr = s.handleFuncExpr(expr)
+	switch t := expr.(type) {
+	case *tree.FuncExpr:
+		fmt.Printf(">>> START POST %q\n", t.String())
+		defer fmt.Printf(">>>>>> END POST %q\n", t.String())
+
+	}
 	return expr
 }
 

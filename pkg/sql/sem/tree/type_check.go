@@ -1218,17 +1218,17 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 	// 		"%s()", def.Name)
 	// }
 
-	s := getOverloadTypeChecker(
+	overloadChecker := getOverloadTypeChecker(
 		(*qualifiedOverloads)(&def.Overloads), expr.Exprs...,
 	)
-	defer s.release()
+	defer overloadChecker.release()
 	var err error
 
 	typeCheckFunc := func() error {
-		if err := s.typeCheckOverloadedExprs(ctx, semaCtx, desired, false /* inBinOp */); err != nil {
+		if err := overloadChecker.typeCheckOverloadedExprs(ctx, semaCtx, desired, false /* inBinOp */); err != nil {
 			return pgerror.Wrapf(err, pgcode.InvalidParameterValue, "%s()", def.Name)
 		}
-		if expr.InCall && len(s.overloadIdxs) == 0 {
+		if expr.InCall && len(overloadChecker.overloadIdxs) == 0 {
 			// Since we didn't find the overload, let's see whether the user
 			// made a mistake and attempted to call a UDF. We attempt this by
 			// temporarily adjusting the RoutineType of each UDF to be
@@ -1277,7 +1277,7 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 
 	var hasUDFOverload bool
 	var calledOnNullInputFns, notCalledOnNullInputFns intsets.Fast
-	for _, idx := range s.overloadIdxs {
+	for _, idx := range overloadChecker.overloadIdxs {
 		if def.Overloads[idx].CalledOnNullInput {
 			calledOnNullInputFns.Add(int(idx))
 		} else {
@@ -1300,8 +1300,8 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 		return nil, err
 	}
 	if funcCls == AggregateClass {
-		for i := range s.typedExprs {
-			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
+		for i := range overloadChecker.typedExprs {
+			if overloadChecker.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
 				var filtered intsets.Fast
 				for j, ok := notCalledOnNullInputFns.Next(0); ok; j, ok = notCalledOnNullInputFns.Next(j + 1) {
 					if def.Overloads[j].params().GetAt(i).Equivalent(types.String) {
@@ -1315,21 +1315,21 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 
 					// Cast the expression to a string so the execution engine will find
 					// the correct overload.
-					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String)
+					overloadChecker.typedExprs[i] = NewTypedCastExpr(overloadChecker.typedExprs[i], types.String)
 				}
 			}
 		}
-		truncated := s.overloadIdxs[:0]
-		for _, idx := range s.overloadIdxs {
+		truncated := overloadChecker.overloadIdxs[:0]
+		for _, idx := range overloadChecker.overloadIdxs {
 			if calledOnNullInputFns.Contains(int(idx)) ||
 				notCalledOnNullInputFns.Contains(int(idx)) {
 				truncated = append(truncated, idx)
 			}
 		}
-		s.overloadIdxs = truncated
+		overloadChecker.overloadIdxs = truncated
 	}
 
-	if len(s.overloadIdxs) == 0 {
+	if len(overloadChecker.overloadIdxs) == 0 {
 		if expr.InCall {
 			return nil, errors.WithHint(
 				pgerror.Newf(pgcode.UndefinedFunction, "procedure %s does not exist",
@@ -1339,7 +1339,7 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 			)
 		}
 		return nil, errors.WithHint(
-			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
+			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, overloadChecker.typedExprs, desired)),
 			"No function matches the given name and argument types. You might need to add explicit type casts.",
 		)
 	}
@@ -1350,10 +1350,10 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 	// within a CALL statement because procedures are always called on NULL
 	// input, and because optbuilder requires a FuncExpr to remain after
 	// type-checking.
-	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && funcCls != GeneratorClass &&
+	if len(overloadChecker.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && funcCls != GeneratorClass &&
 		funcCls != AggregateClass && !hasUDFOverload &&
 		semaCtx != nil && !expr.InCall {
-		for _, expr := range s.typedExprs {
+		for _, expr := range overloadChecker.typedExprs {
 			if expr.ResolvedType().Family() == types.UnknownFamily {
 				return nil, nil
 				// panic("temp")
@@ -1370,8 +1370,8 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 	} else {
 		// Get overloads from the most significant schema in search path.
 		favoredOverload, err = getMostSignificantOverload(
-			def.Overloads, s.overloads, s.overloadIdxs, semaCtx.SearchPath, expr, s.typedExprs,
-			func() string { return getFuncSig(expr, s.typedExprs, desired) },
+			def.Overloads, overloadChecker.overloads, overloadChecker.overloadIdxs, semaCtx.SearchPath, expr, overloadChecker.typedExprs,
+			func() string { return getFuncSig(expr, overloadChecker.typedExprs, desired) },
 		)
 		if err != nil {
 			return nil, err
@@ -1399,7 +1399,7 @@ func (expr *FuncExpr) OverLoadCheck(ctx context.Context, semaCtx *SemaContext, d
 			// despite having overloads for REFCURSOR. This maintains compatibility
 			// with postgres without having to add special checks in optimizer rules
 			// for REFCURSOR.
-			if len(s.typedExprs) > 0 && s.typedExprs[0].ResolvedType().Family() == types.RefCursorFamily {
+			if len(overloadChecker.typedExprs) > 0 && overloadChecker.typedExprs[0].ResolvedType().Family() == types.RefCursorFamily {
 				return nil, pgerror.Newf(pgcode.UndefinedFunction, "function %s(refcursor) does not exist", def.Name)
 			}
 		}
