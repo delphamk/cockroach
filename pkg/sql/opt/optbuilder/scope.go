@@ -1103,6 +1103,12 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
+		t, def = s.replaceCount(t, def)
+
+		expr = t.Walk(s)
+
+		t = expr.(*tree.FuncExpr)
+
 		if isGenerator(def) && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
 			break
@@ -1184,7 +1190,11 @@ func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinitio
 	s.builder.semaCtx.Properties.Require(s.context.String(),
 		tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
 
-	expr := f.Walk(s)
+	convert := func(e *tree.FuncExpr) tree.Expr {
+		return e
+	}
+	expr := convert(f)
+
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)
@@ -1255,7 +1265,7 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
+	// f, def = s.replaceCount(f, def)
 
 	// We need to save and restore the previous value of the field in
 	// semaCtx in case we are recursively called within a subquery
@@ -1289,7 +1299,10 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
 	}
 
-	expr := fCopy.Walk(s)
+	convert := func(e *tree.FuncExpr) tree.Expr {
+		return e
+	}
+	expr := convert(&fCopy)
 
 	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
@@ -1363,7 +1376,7 @@ func (s *scope) constructWindowDef(def tree.WindowDef) tree.WindowDef {
 }
 
 func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
+	// f, def = s.replaceCount(f, def)
 
 	if err := tree.CheckIsWindowOrAgg(def); err != nil {
 		panic(err)
@@ -1382,7 +1395,10 @@ func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefi
 	newWindowDef := s.constructWindowDef(*f.WindowDef)
 	fCopy.WindowDef = &newWindowDef
 
-	expr := fCopy.Walk(s)
+	convert := func(e *tree.FuncExpr) tree.Expr {
+		return e
+	}
+	expr := convert(&fCopy)
 
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
@@ -1467,7 +1483,11 @@ func (s *scope) replaceSQLFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinit
 
 	s.builder.semaCtx.Properties.Require("SQL function", tree.RejectSpecial)
 
-	expr := f.Walk(s)
+	convert := func(e *tree.FuncExpr) tree.Expr {
+		return e
+	}
+	expr := convert(f)
+
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)
