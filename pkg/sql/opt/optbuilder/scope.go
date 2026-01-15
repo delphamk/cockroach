@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/build"
@@ -685,6 +686,8 @@ func (s *scope) findFuncArgCol(ord int) *scopeColumn {
 // If endAggFunc returns a different scope than startAggFunc, the columns
 // will be transferred to the correct scope by buildAggregateFunction.
 func (s *scope) startAggFunc() *scope {
+	fmt.Printf(">>> startAggFunc \n")
+
 	if s.inAgg {
 		panic(sqlerrors.NewAggInAggError())
 	}
@@ -707,6 +710,8 @@ func (s *scope) startAggFunc() *scope {
 // references no variables). endAggFunc also ensures that aggregate functions
 // are only used in a groupings scope.
 func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
+	fmt.Printf(">>> endAggFunc\n")
+
 	if !s.inAgg {
 		panic(errors.AssertionFailedf("mismatched calls to start/end aggFunc"))
 	}
@@ -722,7 +727,7 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 		}
 	}
 
-	panic(errors.AssertionFailedf("aggregate function is not allowed in this context"))
+	panic(pgerror.New(pgcode.Grouping, "aggregate function WRONG ERROR"))
 }
 
 // verifyAggregateContext checks that the current scope is allowed to contain
@@ -1009,6 +1014,24 @@ func makeUntypedTuple(labels []string, texprs []tree.TypedExpr) *tree.Tuple {
 	return &tree.Tuple{Exprs: exprs, Labels: labels}
 }
 
+var count = 0
+
+func printStack() {
+	input := fmt.Sprintf("%s", debug.Stack())
+	if !strings.HasSuffix(input, "\n") {
+		input += "\n"
+	}
+	lines := strings.Split(input, "\n")
+	var filtered []string
+	for _, line := range lines {
+		if !strings.Contains(line, "github.com") {
+			filtered = append(filtered, line)
+		}
+	}
+	result := strings.Join(filtered, "\n")
+	fmt.Printf(">>> stack: %v\n", strings.TrimSpace(result))
+}
+
 // VisitPre is part of the Visitor interface.
 //
 // NB: This code is adapted from sql/select_name_resolution.go and
@@ -1088,6 +1111,10 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
+		fmt.Printf(">>> VISITPRE %v\n", t.String())
+
+		// printStack()
+
 		semaCtx := s.builder.semaCtx
 		// TODO(mgartner): At this point the the function has not been type checked
 		// and resolved to one overload yet. Consider refactoring this so that it
@@ -1108,26 +1135,67 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		expr = t.Walk(s)
 
 		t = expr.(*tree.FuncExpr)
+		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+
+		test1 := func() {
+			if true{
+				return
+			}
+
+			count++
+			c := count
+			fmt.Printf("\n>>> START %v test1\n", c)
+			defer fmt.Printf(">>> END %v test1\n\n", c)
+
+			x := t
+			typedFuncX, err := tree.TypeCheck(s.builder.ctx, x, s.builder.semaCtx, types.Any)
+			if err != nil {
+				fmt.Printf(">>> err %v\n", err)
+				panic(err)
+			} else {
+				newT, ok := typedFuncX.(*tree.FuncExpr)
+				if !ok {
+					panic("not a FuncExpr")
+				} else {
+					fmt.Printf(">>> newT %T %q\n", newT, newT.String())
+					t = newT
+				}
+			}
+
+		}
 
 		if isGenerator(def) && s.replaceSRFs {
+			test1()
 			expr = s.replaceSRF(t, def)
 			break
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
+			fmt.Printf(">>>>>> RejectParentAgg? %v\n", semaCtx.Properties.IsSet(tree.RejectParentAgg))
+			semaCtx.Properties.Reject(tree.RejectParentAgg)
+			// s.startAggFunc()
+			// s.builder.semaCtx.Properties.Require("aggregate",
+			// 	tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
+			test1()
 			expr = s.replaceAggregate(t, def)
+
+			// property should be set here.
+
 			break
 		}
 
 		if t.WindowDef != nil {
+			test1()
 			expr = s.replaceWindowFn(t, def)
 			break
 		}
 
 		if isSQLFn(def) {
+			test1()
 			expr = s.replaceSQLFn(t, def)
 			break
 		}
+		test1()
 
 	case *tree.ArrayFlatten:
 		if sub, ok := t.Subquery.(*tree.Subquery); ok {
@@ -1270,6 +1338,10 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// We need to save and restore the previous value of the field in
 	// semaCtx in case we are recursively called within a subquery
 	// context.
+
+	// fmt.Printf(">>> \t SeenAggregate1 %v\n", s.builder.semaCtx.Properties.Derived.SeenAggregate)
+	// s.builder.semaCtx.Properties.Derived.SeenAggregate = true
+
 	defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 	s.builder.semaCtx.Properties.Require("aggregate",
@@ -1308,6 +1380,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
 	// building aggregate function arguments below in buildAggregateFunction.
+	// s.inAgg = false
 	tempScope := s.startAggFunc()
 
 	// We need to do this check here to ensure that we check the usage of special
@@ -1325,15 +1398,15 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		}()
 	}
 
-	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
-	if err != nil {
-		panic(err)
-	}
-	if typedFunc == tree.DNull {
-		return tree.DNull
-	}
+	// typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// if typedFunc == tree.DNull {
+	// 	return tree.DNull
+	// }
 
-	f = typedFunc.(*tree.FuncExpr)
+	f = expr.(*tree.FuncExpr)
 
 	private := memo.FunctionPrivate{
 		Name:       def.Name,

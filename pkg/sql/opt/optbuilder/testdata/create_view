@@ -317,11 +317,9 @@ CREATE TABLE tf (f FLOAT)
 build
 CREATE VIEW v17 AS SELECT percentile_cont(0.50) WITHIN GROUP (ORDER BY f) FROM tf
 ----
-create-view t.public.v17
- ├── SELECT percentile_cont(0.50) WITHIN GROUP (ORDER BY f) FROM t.public.tf
- ├── columns: percentile_cont:6
- └── dependencies
-      └── tf [columns: f]
+error (42725): ambiguous call: percentile_cont(decimal), candidates are:
+percentile_cont(float) -> float
+percentile_cont(float) -> interval
 
 # Dependencies should be tracked with multiple table statements.
 build
