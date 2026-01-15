@@ -206,6 +206,8 @@ const (
 		RejectGenerators |
 		RejectWindowApplications |
 		RejectProcedures
+
+	RejectParentAgg
 )
 
 // ScalarProperties contains the properties of the current scalar

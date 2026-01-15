@@ -1110,6 +1110,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		if isAggregate(def) && t.WindowDef == nil {
 			expr = s.replaceAggregate(t, def)
+			s.builder.semaCtx.Properties.IsSet(tree.RejectParentAgg)
 			break
 		}
 
