@@ -12,9 +12,6 @@ build
 SELECT max((SELECT jsonb_agg(v))) FROM kv
 ----
 error (42803): aggregate function WRONG ERROR
-
-
-
 # build
 # SELECT min(1)
 # ----

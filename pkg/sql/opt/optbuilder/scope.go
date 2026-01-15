@@ -1138,9 +1138,9 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 		test1 := func() {
-			if true{
-				return
-			}
+			// if true {
+			// 	return
+			// }
 
 			count++
 			c := count
@@ -1371,11 +1371,20 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
 	}
 
-	convert := func(e *tree.FuncExpr) tree.Expr {
-		return e
+	// convert := func(e *tree.FuncExpr) tree.Expr {
+	// 	return e
+	// }
+	// expr := convert(&fCopy)
+	expr := f.Walk(s)
+	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+	if err != nil {
+		panic(err)
 	}
-	expr := convert(&fCopy)
+	if typedFunc == tree.DNull {
+		return tree.DNull
+	}
 
+	f = typedFunc.(*tree.FuncExpr)
 	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
