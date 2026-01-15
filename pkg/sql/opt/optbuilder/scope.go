@@ -1171,8 +1171,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
-			fmt.Printf(">>>>>> RejectParentAgg? %v\n", semaCtx.Properties.IsSet(tree.RejectParentAgg))
-			semaCtx.Properties.Reject(tree.RejectParentAgg)
+			// fmt.Printf(">>>>>> RejectParentAgg? %v\n", semaCtx.Properties.IsSet(tree.RejectParentAgg))
+			// semaCtx.Properties.Reject(tree.RejectParentAgg)
 			// s.startAggFunc()
 			// s.builder.semaCtx.Properties.Require("aggregate",
 			// 	tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)

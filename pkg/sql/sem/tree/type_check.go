@@ -207,7 +207,7 @@ const (
 		RejectWindowApplications |
 		RejectProcedures
 
-	RejectParentAgg
+	// RejectParentAgg
 )
 
 // ScalarProperties contains the properties of the current scalar
@@ -1103,6 +1103,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 			if sc.Properties.IsSet(RejectAggregates) {
 				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
 			}
+			sc.Properties.Derived.SeenAggregate = true
 		}
 	}
 	if fnCls == GeneratorClass {
