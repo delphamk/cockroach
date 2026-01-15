@@ -26,7 +26,7 @@ const MaxAllocatedStringSize = 128 * 1024 * 1024
 
 // ErrInsufficientArgsFmtString represents illegal or unknown argument(s) to
 // builtin functions.
-const ErrInsufficientArgsFmtString = "unknown signature: %s()"
+const ErrInsufficientArgsFmtString = "unknown signaturze: %s()"
 
 // The following constants are used to categorize builtin functions
 // for documentation.

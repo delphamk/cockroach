@@ -201,13 +201,14 @@ const (
 	// RejectProcedures rejects procedures in scalar contexts.
 	RejectProcedures
 
+	// RejectParentAgg
+	RejectParentAgg
+
 	// RejectSpecial is used in common places like the LIMIT clause.
 	RejectSpecial = RejectAggregates |
 		RejectGenerators |
 		RejectWindowApplications |
 		RejectProcedures
-
-	// RejectParentAgg
 )
 
 // ScalarProperties contains the properties of the current scalar
@@ -1039,7 +1040,7 @@ var (
 // NewAggInAggError creates an error for the case when an aggregate function is
 // contained within another aggregate function.
 func NewAggInAggError() error {
-	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nested")
+	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nestedz1")
 }
 
 // NewInvalidNestedSRFError creates a rejection for a nested SRF.
@@ -1063,7 +1064,7 @@ func NewInvalidFunctionUsageError(class FunctionClass, context string) error {
 		cat = "set-returning"
 		code = pgcode.FeatureNotSupported
 	}
-	return pgerror.Newf(code, "%s functions are not allowed in %s", cat, context)
+	return pgerror.Newf(code, "%s functions are nozt allowed in %s", cat, context)
 }
 
 // checkFunctionUsage checks whether a given built-in function is
@@ -1098,10 +1099,11 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 		if fnCls == AggregateClass {
 			if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
 				sc.Properties.IsSet(RejectNestedAggregates) {
+				fmt.Printf(">>> NewAggInAggError expr: %v\n", expr.String())
 				return NewAggInAggError()
 			}
 			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
+				return NewInvalidFunctionUsageError(AggregateClass, "test")
 			}
 			sc.Properties.Derived.SeenAggregate = true
 		}
@@ -1361,7 +1363,7 @@ func (expr *FuncExpr) TypeCheck(
 			)
 		}
 		return nil, errors.WithHint(
-			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
+			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature3: %s", getFuncSig(expr, s.typedExprs, desired)),
 			"No function matches the given name and argument types. You might need to add explicit type casts.",
 		)
 	}
@@ -3684,7 +3686,7 @@ func getMostSignificantOverload(
 		// This should never happen. Otherwise, it means we get function from a
 		// schema no on the given search path or we try to resolve a function on an
 		// explicit schema, but get some function from other schemas are fetched.
-		return QualifiedOverload{}, pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig())
+		return QualifiedOverload{}, pgerror.Newf(pgcode.UndefinedFunction, "unknown signature4: %s", getFuncSig())
 	}
 	return ret, nil
 }

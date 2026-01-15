@@ -567,6 +567,8 @@ func (expr *RangeCond) Walk(v Visitor) Expr {
 
 // Walk implements the Expr interface.
 func (expr *Subquery) Walk(v Visitor) Expr {
+	fmt.Printf("zzzzzzzzzzzz>>> Subquery WALK\n")
+
 	sel, changed := WalkStmt(v, expr.Select)
 	if changed {
 		exprCopy := *expr

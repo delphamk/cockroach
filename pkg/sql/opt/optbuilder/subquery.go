@@ -7,6 +7,7 @@ package optbuilder
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/server/telemetry"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
@@ -75,11 +76,21 @@ func (s *subquery) isMultiRow() bool {
 
 // Walk is part of the tree.Expr interface.
 func (s *subquery) Walk(v tree.Visitor) tree.Expr {
+	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+
+	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+
+	s.Subquery.Walk(v)
+
 	return s
 }
 
 // TypeCheck is part of the tree.Expr interface.
-func (s *subquery) TypeCheck(
+func (s *subquery) TypeCheck( // here
 	_ context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
 	if semaCtx != nil && semaCtx.Properties.IsSet(tree.RejectSubqueries) {
@@ -88,7 +99,11 @@ func (s *subquery) TypeCheck(
 			"subqueries are not allowed in %s", semaCtx.Properties.Context())
 	}
 
+	fmt.Printf(">>> subquery TypeCheck: RejectNestedAggregates %v\n", semaCtx.Properties.IsSet(tree.RejectNestedAggregates))
+
 	if s.typ != nil {
+		fmt.Printf(">>> ALREADY TYPED \n")
+
 		return s, nil
 	}
 

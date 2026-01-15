@@ -32,6 +32,7 @@ package optbuilder
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/cat"
@@ -213,7 +214,9 @@ type aggregateInfo struct {
 }
 
 // Walk is part of the tree.Expr interface.
-func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr {
+func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr { // here
+	fmt.Printf("yyyyyyyyyyy>>> Subquery WALK\n")
+
 	return a
 }
 
@@ -221,6 +224,8 @@ func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr {
 func (a *aggregateInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+	fmt.Printf("wwwwwwwwwww>>> aggregateInfo TypeCheck\n")
+
 	if _, err := a.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}

@@ -1037,6 +1037,8 @@ func printStack() {
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
+	fmt.Printf("\t\t\t============================= %T\n", expr)
+
 	switch t := expr.(type) {
 	case *tree.AllColumnsSelector, *tree.TupleStar:
 		// AllColumnsSelectors and TupleStars at the top level of a SELECT clause
@@ -1111,7 +1113,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
-		fmt.Printf(">>> VISITPRE %v\n", t.String())
+		fmt.Printf(">>> VISITPRE FuncExpr %v\n", t.String())
 
 		// printStack()
 
@@ -1132,7 +1134,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		t, def = s.replaceCount(t, def)
 
+		fmt.Printf("\t\t\t>>> pre walk \n")
+
 		expr = t.Walk(s)
+
+		fmt.Printf("\t\t\t>>> pre walk done \n")
 
 		t = expr.(*tree.FuncExpr)
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
@@ -1158,6 +1164,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 					panic("not a FuncExpr")
 				} else {
 					fmt.Printf(">>> newT %T %q\n", newT, newT.String())
+
+					if len(newT.Exprs) > 0 {
+						fmt.Printf(">>> newT.child %T %q\n", newT.Exprs[0], newT.Exprs[0].String())
+
+					}
 					t = newT
 				}
 			}
@@ -1171,13 +1182,20 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
-			// fmt.Printf(">>>>>> RejectParentAgg? %v\n", semaCtx.Properties.IsSet(tree.RejectParentAgg))
-			// semaCtx.Properties.Reject(tree.RejectParentAgg)
-			// s.startAggFunc()
-			// s.builder.semaCtx.Properties.Require("aggregate",
-			// 	tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
+			// p := s.builder.semaCtx.Properties
+			// defer s.builder.semaCtx.Properties.Restore(p)
+
 			test1()
+
+			fmt.Printf(">>> PREE replaceAggregate TYPE %T %q\n", t, t.String())
+			for _, e := range t.Exprs {
+				fmt.Printf(">>> PREE replaceAggregate TYPE [E] %T %q\n", e, e.String())
+			}
+			// fmt.Printf(">>> subquery? %v\n", s.builder.subquery != nil)
+
 			expr = s.replaceAggregate(t, def)
+
+			fmt.Printf("ttttttttt>>> replaceAggregate TYPE %T %q\n", expr, expr.String())
 
 			// property should be set here.
 
@@ -1376,6 +1394,11 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// }
 	// expr := convert(&fCopy)
 	expr := f.Walk(s)
+	fmt.Printf("\t\t>>> replace walk TYPE %T %q\n", expr, expr.String())
+
+	// _, ok := expr.(*aggregateInfo)
+	// fmt.Printf(">>> aggregateInfo ok? %v\n", ok)
+
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)
@@ -1755,6 +1778,8 @@ const (
 func (s *scope) replaceSubquery(
 	sub *tree.Subquery, wrapInTuple bool, desiredNumColumns int, extraColsAllowed bool,
 ) *subquery {
+	fmt.Printf(">>> -------- replaceSubquery: %s\n", sub.String())
+
 	return &subquery{
 		Subquery:          sub,
 		wrapInTuple:       wrapInTuple,
