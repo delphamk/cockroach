@@ -1088,6 +1088,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
+		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 		semaCtx := s.builder.semaCtx
 		// TODO(mgartner): At this point the the function has not been type checked
 		// and resolved to one overload yet. Consider refactoring this so that it
@@ -1110,7 +1111,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		if isAggregate(def) && t.WindowDef == nil {
 			expr = s.replaceAggregate(t, def)
-			s.builder.semaCtx.Properties.IsSet(tree.RejectParentAgg)
+			// s.builder.semaCtx.Properties.IsSet(tree.RejectParentAgg)
+			s.builder.semaCtx.Properties.Reject(tree.RejectParentAgg)
 			break
 		}
 
