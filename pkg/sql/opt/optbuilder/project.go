@@ -309,8 +309,8 @@ func (b *Builder) finishBuildScalarRef(
 ) (out opt.ScalarExpr) {
 
 	fmt.Printf("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+	// fmt.Printf(">>> finishBuildScalarRef col.id=%v colRefs=%s outCol=%v\n", col.id, colRefs, outCol.id)
 
-	fmt.Printf(">>> finishBuildScalarRef col.id=%v colRefs=%s outCol=%v\n", col.id, colRefs, outCol.id)
 
 	b.trackReferencedColumnForViews(col)
 	// Update the sets of column references and outer columns if needed.

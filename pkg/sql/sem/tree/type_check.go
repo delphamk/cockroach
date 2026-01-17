@@ -1363,7 +1363,7 @@ func (expr *FuncExpr) TypeCheck(
 			)
 		}
 		return nil, errors.WithHint(
-			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature3: %s", getFuncSig(expr, s.typedExprs, desired)),
+			pgerror.Newf(pgcode.UndefinedFunction, "unknown signature: %s", getFuncSig(expr, s.typedExprs, desired)),
 			"No function matches the given name and argument types. You might need to add explicit type casts.",
 		)
 	}

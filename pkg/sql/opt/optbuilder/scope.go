@@ -1116,7 +1116,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
-		fmt.Printf(">>> VISITPRE FuncExpr %v\n", t.String())
+		fmt.Printf(">>> VISITPRE FuncExpr %v %T\n", t.String(), t)
 
 		// printStack()
 
@@ -1136,12 +1136,13 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		t, def = s.replaceCount(t, def)
-
-		// fmt.Printf("\t\t\t>>> pre walk \n")
+		count++
+		c := count
+		fmt.Printf("\t\t\t>>> pre walk %v\n", c)
 
 		expr = t.Walk(s)
 
-		// fmt.Printf("\t\t\t>>> pre walk done \n")
+		fmt.Printf("\t\t\t>>> pre walk done %v\n", c)
 
 		t = expr.(*tree.FuncExpr)
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
@@ -1151,10 +1152,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			// 	return
 			// }
 
-			count++
-			c := count
-			fmt.Printf("\n>>> START %v test1\n", c)
-			defer fmt.Printf(">>> END %v test1\n\n", c)
+			fmt.Printf("\n>>> START %v EARLY_TYPE_CHECK \texpr=%q\n", c, t)
+			defer fmt.Printf(">>> END %v EARLY_TYPE_CHECK\n\n", c)
 
 			x := t
 			typedFuncX, err := tree.TypeCheck(s.builder.ctx, x, s.builder.semaCtx, types.Any)
@@ -1187,6 +1186,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		if isAggregate(def) && t.WindowDef == nil {
 			// p := s.builder.semaCtx.Properties
 			// defer s.builder.semaCtx.Properties.Restore(p)
+			fmt.Printf(">>> isAggregate\n")
 
 			test1()
 
@@ -1396,6 +1396,8 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// 	return e
 	// }
 	// expr := convert(&fCopy)
+	fmt.Printf(">>> agg walk!!\n")
+
 	expr := f.Walk(s)
 
 	// Update this scope to indicate that we are now inside an aggregate function

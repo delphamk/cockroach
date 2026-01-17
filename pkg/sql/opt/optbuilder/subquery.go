@@ -110,8 +110,8 @@ func (sub *subquery) TypeCheck( // here
 			// stack := debug.Stack()
 			// fmt.Printf(">>> stack: %s\n", stack)
 			// called in replaceAggregate
-			panic(sqlerrors.NewAggInAggError())
-			// return nil, sqlerrors.NewAggInAggError()
+			// panic(sqlerrors.NewAggInAggError())
+			return nil, sqlerrors.NewAggInAggError()
 		}
 		return sub, nil
 	}
