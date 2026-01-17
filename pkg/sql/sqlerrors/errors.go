@@ -7,6 +7,7 @@
 package sqlerrors
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -498,7 +499,9 @@ func NewWindowInAggError() error {
 // NewAggInAggError creates an error for the case when an aggregate function is
 // contained within another aggregate function.
 func NewAggInAggError() error {
-	return pgerror.New(pgcode.Grouping, "aggregate function calls cannot be nestedz2")
+	fmt.Printf(">>> NewAggInAggError!!!!!!!\n")
+
+	return pgerror.New(pgcode.Grouping, "aggregate function calls cannot be nested")
 }
 
 // NewInvalidVolatilityError creates an error for the case when provided

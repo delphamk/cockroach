@@ -107,7 +107,7 @@ func (b *Builder) buildScalar(
 
 		return b.finishBuildScalarRef(t, inScope, outScope, outCol, colRefs)
 
-	case *aggregateInfo:
+	case *aggregateInfo: // here
 		var aggOutScope *scope
 		if inScope.groupby != nil {
 			aggOutScope = inScope.groupby.aggOutScope

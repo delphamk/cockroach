@@ -1217,6 +1217,9 @@ func (b *Builder) buildSelectClause(
 	desiredTypes []*types.T,
 	inScope *scope,
 ) (outScope *scope) {
+
+	fmt.Printf(">>>  buildSelectClause\n")
+
 	if sel.Where != nil {
 		lockCtx.safeUpdate = true
 	}
@@ -1244,6 +1247,8 @@ func (b *Builder) buildSelectClause(
 
 	var having opt.ScalarExpr
 	needsAgg := b.needsAggregation(sel, fromScope)
+	fmt.Printf(">>> needsAgg %v\n", needsAgg)
+
 	if needsAgg {
 		// Grouping columns must be built before building the projection list so
 		// we can check that any column references that appear in the SELECT list

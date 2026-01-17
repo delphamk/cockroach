@@ -710,7 +710,7 @@ func (s *scope) startAggFunc() *scope {
 // references no variables). endAggFunc also ensures that aggregate functions
 // are only used in a groupings scope.
 func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
-	fmt.Printf(">>> endAggFunc\n")
+	fmt.Printf(">>> endAggFunc colSet=%s\n", cols.String())
 
 	if !s.inAgg {
 		panic(errors.AssertionFailedf("mismatched calls to start/end aggFunc"))
@@ -718,8 +718,12 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 	s.inAgg = false
 
 	for curr := s; curr != nil; curr = curr.parent {
+		fmt.Printf(">>> end scope %v #=%v colSet=%s\n", &curr, len(curr.cols), curr.colSet().String())
+
 		if cols.Len() == 0 || cols.Intersects(curr.colSet()) {
 			curr.verifyAggregateContext()
+			fmt.Printf(">>> EXIT endAggFunc cols.Len()=%v intersect=%v\n", cols.Len(), cols.Intersects(curr.colSet()))
+
 			if curr.groupby == nil {
 				curr.initGrouping()
 			}
@@ -1037,7 +1041,6 @@ func printStack() {
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
-	fmt.Printf("\t\t\t============================= %T\n", expr)
 
 	switch t := expr.(type) {
 	case *tree.AllColumnsSelector, *tree.TupleStar:
@@ -1134,11 +1137,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		t, def = s.replaceCount(t, def)
 
-		fmt.Printf("\t\t\t>>> pre walk \n")
+		// fmt.Printf("\t\t\t>>> pre walk \n")
 
 		expr = t.Walk(s)
 
-		fmt.Printf("\t\t\t>>> pre walk done \n")
+		// fmt.Printf("\t\t\t>>> pre walk done \n")
 
 		t = expr.(*tree.FuncExpr)
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
@@ -1187,15 +1190,15 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 			test1()
 
-			fmt.Printf(">>> PREE replaceAggregate TYPE %T %q\n", t, t.String())
-			for _, e := range t.Exprs {
-				fmt.Printf(">>> PREE replaceAggregate TYPE [E] %T %q\n", e, e.String())
-			}
-			// fmt.Printf(">>> subquery? %v\n", s.builder.subquery != nil)
+			// fmt.Printf(">>> PREE replaceAggregate TYPE %T %q\n", t, t.String())
+			// for _, e := range t.Exprs {
+			// 	fmt.Printf(">>> PREE replaceAggregate TYPE [E] %T %q\n", e, e.String())
+			// }
+			// // fmt.Printf(">>> subquery? %v\n", s.builder.subquery != nil)
 
 			expr = s.replaceAggregate(t, def)
 
-			fmt.Printf("ttttttttt>>> replaceAggregate TYPE %T %q\n", expr, expr.String())
+			// fmt.Printf("ttttttttt>>> replaceAggregate TYPE %T %q\n", expr, expr.String())
 
 			// property should be set here.
 
@@ -1394,20 +1397,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// }
 	// expr := convert(&fCopy)
 	expr := f.Walk(s)
-	fmt.Printf("\t\t>>> replace walk TYPE %T %q\n", expr, expr.String())
 
-	// _, ok := expr.(*aggregateInfo)
-	// fmt.Printf(">>> aggregateInfo ok? %v\n", ok)
-
-	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
-	if err != nil {
-		panic(err)
-	}
-	if typedFunc == tree.DNull {
-		return tree.DNull
-	}
-
-	f = typedFunc.(*tree.FuncExpr)
 	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
@@ -1430,13 +1420,13 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		}()
 	}
 
-	// typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// if typedFunc == tree.DNull {
-	// 	return tree.DNull
-	// }
+	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+	if err != nil {
+		panic(err)
+	}
+	if typedFunc == tree.DNull {
+		return tree.DNull
+	}
 
 	f = expr.(*tree.FuncExpr)
 
@@ -1778,7 +1768,7 @@ const (
 func (s *scope) replaceSubquery(
 	sub *tree.Subquery, wrapInTuple bool, desiredNumColumns int, extraColsAllowed bool,
 ) *subquery {
-	fmt.Printf(">>> -------- replaceSubquery: %s\n", sub.String())
+	fmt.Printf(">>> -------- replaceSubquery: %s scopre addr: %v\n", sub.String(), &s)
 
 	return &subquery{
 		Subquery:          sub,

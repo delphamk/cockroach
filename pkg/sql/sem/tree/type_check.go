@@ -1040,7 +1040,7 @@ var (
 // NewAggInAggError creates an error for the case when an aggregate function is
 // contained within another aggregate function.
 func NewAggInAggError() error {
-	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nestedz1")
+	return pgerror.Newf(pgcode.Grouping, "aggregate function calls cannot be nested")
 }
 
 // NewInvalidNestedSRFError creates a rejection for a nested SRF.
@@ -1064,7 +1064,7 @@ func NewInvalidFunctionUsageError(class FunctionClass, context string) error {
 		cat = "set-returning"
 		code = pgcode.FeatureNotSupported
 	}
-	return pgerror.Newf(code, "%s functions are nozt allowed in %s", cat, context)
+	return pgerror.Newf(code, "%s functions are not allowed in %s", cat, context)
 }
 
 // checkFunctionUsage checks whether a given built-in function is
@@ -1103,7 +1103,7 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 				return NewAggInAggError()
 			}
 			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, "test")
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
 			}
 			sc.Properties.Derived.SeenAggregate = true
 		}

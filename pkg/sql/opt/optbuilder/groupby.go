@@ -215,7 +215,7 @@ type aggregateInfo struct {
 
 // Walk is part of the tree.Expr interface.
 func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr { // here
-	fmt.Printf("yyyyyyyyyyy>>> Subquery WALK\n")
+	// fmt.Printf("yyyyyyyyyyy>>> Subquery WALK\n")
 
 	return a
 }
@@ -224,7 +224,7 @@ func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr { // here
 func (a *aggregateInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
-	fmt.Printf("wwwwwwwwwww>>> aggregateInfo TypeCheck\n")
+	// fmt.Printf("wwwwwwwwwww>>> aggregateInfo TypeCheck\n")
 
 	if _, err := a.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
@@ -341,6 +341,8 @@ func (b *Builder) buildGroupingColumns(sel *tree.SelectClause, projectionsScope,
 // buildAggregation builds the aggregation operators and constructs the
 // GroupBy expression. Returns the output scope for the aggregation operation.
 func (b *Builder) buildAggregation(having opt.ScalarExpr, fromScope *scope) (outScope *scope) {
+	fmt.Printf(">>> buildAggregation! \n")
+
 	g := fromScope.groupby
 
 	groupingCols := g.groupingCols()
@@ -658,10 +660,16 @@ func (b *Builder) buildAggArg(
 	// This synthesizes a new tempScope column, unless the argument is a
 	// simple VariableOp.
 	col := tempScope.addColumn(scopeColName(""), e)
+	fmt.Printf(">>> 1111111111!!!!!!!!!!! buildAggArg col.id %v info.colRefs=%s\n", col.id, info.colRefs)
+
 	b.buildScalar(e, fromScope, tempScope, col, &info.colRefs)
+	fmt.Printf(">>> 222222222!!!!!!!!!!! buildAggArg col.id %v col.scalar? %v info.colRefs=%s\n", col.id, col.scalar != nil, info.colRefs)
+
 	if col.scalar != nil {
 		return col.scalar
 	}
+	fmt.Printf(">>> 333333333333333333!!!!!!!!!!! buildAggArg col.id %v\n", col.id)
+
 	return b.factory.ConstructVariable(col.id)
 }
 
@@ -750,6 +758,8 @@ func (b *Builder) buildAggregateFunction(
 	// to the list of aggregates that need to be computed by the groupby
 	// expression and synthesize a column for the aggregation result.
 	info.col = g.findAggregate(info)
+	fmt.Printf(">>> after findAgg info.col = %v\n", info.col)
+
 	if info.col == nil {
 		// Translate function name if needed.
 		funcName := translateAggName(def.Name)
@@ -767,11 +777,14 @@ func (b *Builder) buildAggregateFunction(
 		// Add the aggregate to the list of aggregates that need to be computed by
 		// the groupby expression.
 		g.aggs = append(g.aggs, info)
+
 	} else {
 		// Undo the adding of the args.
 		// TODO(radu): is there a cleaner way to do this?
 		tempScope.cols = tempScope.cols[:tempScopeColsBefore]
 	}
+	fmt.Printf(">>>>>> now info.colRefs=%s\n", info.colRefs)
+	fmt.Printf(">>>>>> now info.col.id=%v\n", info.col.id)
 
 	return &info
 }

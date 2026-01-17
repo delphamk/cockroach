@@ -16,6 +16,7 @@ import (
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree"
 	"github.com/cockroachdb/cockroach/pkg/sql/sem/tree/treecmp"
+	"github.com/cockroachdb/cockroach/pkg/sql/sqlerrors"
 	"github.com/cockroachdb/cockroach/pkg/sql/sqltelemetry"
 	"github.com/cockroachdb/cockroach/pkg/sql/types"
 	"github.com/cockroachdb/errors"
@@ -70,27 +71,27 @@ type subquery struct {
 }
 
 // isMultiRow returns whether the subquery can return multiple rows.
-func (s *subquery) isMultiRow() bool {
-	return s.wrapInTuple && !s.Exists
+func (sub *subquery) isMultiRow() bool {
+	return sub.wrapInTuple && !sub.Exists
 }
 
 // Walk is part of the tree.Expr interface.
-func (s *subquery) Walk(v tree.Visitor) tree.Expr {
-	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
-	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
-	fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+func (sub *subquery) Walk(v tree.Visitor) tree.Expr {
+	// fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+	// fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
+	// fmt.Printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx>>> subquery WALK\n")
 
-	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
-	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
-	defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+	// defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+	// defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
+	// defer fmt.Printf("XXXXXXXXXXXXXXXXXXXXXXXXXX>>> subquery WALK\n")
 
-	s.Subquery.Walk(v)
+	// s.Subquery.Walk(v)
 
-	return s
+	return sub
 }
 
 // TypeCheck is part of the tree.Expr interface.
-func (s *subquery) TypeCheck( // here
+func (sub *subquery) TypeCheck( // here
 	_ context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
 	if semaCtx != nil && semaCtx.Properties.IsSet(tree.RejectSubqueries) {
@@ -99,12 +100,20 @@ func (s *subquery) TypeCheck( // here
 			"subqueries are not allowed in %s", semaCtx.Properties.Context())
 	}
 
-	fmt.Printf(">>> subquery TypeCheck: RejectNestedAggregates %v\n", semaCtx.Properties.IsSet(tree.RejectNestedAggregates))
+	fmt.Printf("-------- SUBQUERY SCOPE ---- %v s.scope.colSet=%s outerCols=%s\n", &sub.scope, sub.scope.colSet(), sub.outerCols)
 
-	if s.typ != nil {
-		fmt.Printf(">>> ALREADY TYPED \n")
+	if sub.typ != nil {
+		isRejectNestedAggregates := semaCtx.Properties.IsSet(tree.RejectNestedAggregates)
+		fmt.Printf(">>> ALREADY TYPED %v, isRejectNestedAggregates=%v\n", sub.typ, isRejectNestedAggregates)
+		if isRejectNestedAggregates && sub.outerCols.Len() > 0 {
 
-		return s, nil
+			// stack := debug.Stack()
+			// fmt.Printf(">>> stack: %s\n", stack)
+			// called in replaceAggregate
+			panic(sqlerrors.NewAggInAggError())
+			// return nil, sqlerrors.NewAggInAggError()
+		}
+		return sub, nil
 	}
 
 	// Convert desired to an array of desired types for building the subquery.
@@ -112,7 +121,7 @@ func (s *subquery) TypeCheck( // here
 
 	// Build the subquery. We cannot build the subquery earlier because we do
 	// not know the desired types until TypeCheck is called.
-	s.buildSubquery(desiredTypes)
+	sub.buildSubquery(desiredTypes)
 
 	// The typing for subqueries is complex, but regular.
 	//
@@ -170,24 +179,24 @@ func (s *subquery) TypeCheck( // here
 	// Without that auto-unwrapping of single-column subqueries, this query would
 	// type check as "<int> IN <tuple{tuple{int}}>" which would fail.
 
-	if s.Exists {
-		s.typ = types.Bool
-		return s, nil
+	if sub.Exists {
+		sub.typ = types.Bool
+		return sub, nil
 	}
 
-	if len(s.cols) == 1 {
-		s.typ = s.cols[0].typ
+	if len(sub.cols) == 1 {
+		sub.typ = sub.cols[0].typ
 	} else {
-		contents := make([]*types.T, len(s.cols))
-		labels := make([]string, len(s.cols))
-		for i := range s.cols {
-			contents[i] = s.cols[i].typ
-			labels[i] = string(s.cols[i].name.ReferenceName())
+		contents := make([]*types.T, len(sub.cols))
+		labels := make([]string, len(sub.cols))
+		for i := range sub.cols {
+			contents[i] = sub.cols[i].typ
+			labels[i] = string(sub.cols[i].name.ReferenceName())
 		}
-		s.typ = types.MakeLabeledTuple(contents, labels)
+		sub.typ = types.MakeLabeledTuple(contents, labels)
 	}
 
-	if s.wrapInTuple {
+	if sub.wrapInTuple {
 		// The subquery is in a multi-row context. For example:
 		//
 		//   SELECT 1 IN (SELECT * FROM t)
@@ -198,42 +207,42 @@ func (s *subquery) TypeCheck( // here
 		// subquery works with the current type checking code, but seems
 		// semantically incorrect. A tuple represents a fixed number of
 		// elements. Instead, we should introduce a new vtuple type.
-		s.typ = types.MakeTuple([]*types.T{s.typ})
+		sub.typ = types.MakeTuple([]*types.T{sub.typ})
 	}
 
-	return s, nil
+	return sub, nil
 }
 
 // ResolvedType is part of the tree.TypedExpr interface.
-func (s *subquery) ResolvedType() *types.T {
-	return s.typ
+func (sub *subquery) ResolvedType() *types.T {
+	return sub.typ
 }
 
 // Eval is part of the tree.TypedExpr interface.
-func (s *subquery) Eval(_ context.Context, _ tree.ExprEvaluator) (tree.Datum, error) {
+func (sub *subquery) Eval(_ context.Context, _ tree.ExprEvaluator) (tree.Datum, error) {
 	panic(errors.AssertionFailedf("subquery must be replaced before evaluation"))
 }
 
 // buildSubquery builds a relational expression that represents this subquery.
 // It stores the resulting relational expression in s.node, and also updates
 // s.cols and s.ordering with the output columns and ordering of the subquery.
-func (s *subquery) buildSubquery(desiredTypes []*types.T) {
-	if s.scope.replaceSRFs {
+func (sub *subquery) buildSubquery(desiredTypes []*types.T) {
+	if sub.scope.replaceSRFs {
 		// We need to save and restore the previous value of the replaceSRFs field in
 		// case we are recursively called within a subquery context.
-		defer func() { s.scope.replaceSRFs = true }()
-		s.scope.replaceSRFs = false
+		defer func() { sub.scope.replaceSRFs = true }()
+		sub.scope.replaceSRFs = false
 	}
 
 	// Save and restore the previous value of s.builder.subquery in case we are
 	// recursively called within a subquery context.
-	outer := s.scope.builder.subquery
-	defer func() { s.scope.builder.subquery = outer }()
-	s.scope.builder.subquery = s
+	outer := sub.scope.builder.subquery
+	defer func() { sub.scope.builder.subquery = outer }()
+	sub.scope.builder.subquery = sub
 
 	// We must push() here so that the columns in s.scope are correctly identified
 	// as outer columns.
-	outScope := s.scope.builder.buildStmt(s.Subquery.Select, desiredTypes, s.scope.push())
+	outScope := sub.scope.builder.buildStmt(sub.Subquery.Select, desiredTypes, sub.scope.push())
 
 	ord := outScope.ordering
 
@@ -243,16 +252,16 @@ func (s *subquery) buildSubquery(desiredTypes []*types.T) {
 	outScope.setTableAlias("")
 	outScope.removeHiddenCols()
 
-	if s.desiredNumColumns > 0 {
-		if len(outScope.cols) != s.desiredNumColumns {
+	if sub.desiredNumColumns > 0 {
+		if len(outScope.cols) != sub.desiredNumColumns {
 			n := len(outScope.cols)
-			switch s.desiredNumColumns {
+			switch sub.desiredNumColumns {
 			case 1:
 				panic(pgerror.Newf(pgcode.Syntax,
 					"subquery must return only one column, found %d", n))
 			default:
 				panic(pgerror.Newf(pgcode.Syntax,
-					"subquery must return %d columns, found %d", s.desiredNumColumns, n))
+					"subquery must return %d columns, found %d", sub.desiredNumColumns, n))
 			}
 		}
 	} else {
@@ -264,7 +273,7 @@ func (s *subquery) buildSubquery(desiredTypes []*types.T) {
 		// don't match.
 		numSubqueryCols := len(outScope.cols)
 		if !desireAnyType && len(desiredTypes) != numSubqueryCols {
-			if s.wrapInTuple && numSubqueryCols == 1 {
+			if sub.wrapInTuple && numSubqueryCols == 1 {
 				colTyp := outScope.cols[0].typ
 				if colTyp.Family() == types.TupleFamily {
 					numSubqueryCols = len(colTyp.TupleContents())
@@ -281,17 +290,17 @@ func (s *subquery) buildSubquery(desiredTypes []*types.T) {
 		}
 	}
 
-	if len(outScope.extraCols) > 0 && !s.extraColsAllowed {
+	if len(outScope.extraCols) > 0 && !sub.extraColsAllowed {
 		// We need to add a projection to remove the extra columns.
 		projScope := outScope.push()
 		projScope.appendColumnsFromScope(outScope)
-		projScope.expr = s.scope.builder.constructProject(outScope.expr, projScope.cols)
+		projScope.expr = sub.scope.builder.constructProject(outScope.expr, projScope.cols)
 		outScope = projScope
 	}
 
-	s.cols = outScope.cols
-	s.node = outScope.expr
-	s.ordering = ord
+	sub.cols = outScope.cols
+	sub.node = outScope.expr
+	sub.ordering = ord
 }
 
 // buildSubqueryProjection ensures that a subquery returns exactly one column.

@@ -7,26 +7,8 @@ CREATE TABLE kv (
 )
 ----
 
+# Regression test for #51877.
 build
 SELECT max((SELECT jsonb_agg(v))) FROM kv
 ----
-error (42803): aggregate function WRONG ERROR
-
-
-# build
-# SELECT max(max(v)) FROM kv
-# ----
-# error (42803): max(): max(): aggregate function calls cannot be nestedz1
-
-# build
-# SELECT max(v) FROM kv
-# ----
-# scalar-group-by
-#  ├── columns: max:7
-#  ├── project
-#  │    ├── columns: v:2
-#  │    └── scan kv
-#  │         └── columns: k:1!null v:2 w:3 s:4 crdb_internal_mvcc_timestamp:5 tableoid:6
-#  └── aggregations
-#       └── max [as=max:7]
-#            └── v:2
+error (42803): aggregate function calls cannot be nested

@@ -6,6 +6,8 @@
 package optbuilder
 
 import (
+	"fmt"
+
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/memo"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -306,6 +308,10 @@ func (b *Builder) finishBuildScalarRef(
 	col *scopeColumn, inScope, outScope *scope, outCol *scopeColumn, colRefs *opt.ColSet,
 ) (out opt.ScalarExpr) {
 
+	fmt.Printf("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+
+	fmt.Printf(">>> finishBuildScalarRef col.id=%v colRefs=%s outCol=%v\n", col.id, colRefs, outCol.id)
+
 	b.trackReferencedColumnForViews(col)
 	// Update the sets of column references and outer columns if needed.
 	if colRefs != nil {
@@ -314,12 +320,18 @@ func (b *Builder) finishBuildScalarRef(
 
 	// Collect the outer columns of the current subquery, if any.
 	isOuterColumn := inScope == nil || inScope.isOuterColumn(col.id)
+	fmt.Printf(">>> isOuterColumn %v inScope == nil? %v\n", isOuterColumn, inScope == nil)
+
 	if isOuterColumn && b.subquery != nil {
+		fmt.Printf(">>>>>>>>> ADDING TO outerCols. col.id=%v\n", col.id)
+
 		b.subquery.outerCols.Add(col.id)
 	}
 
 	// If this is not a projection context, then wrap the column reference with
 	// a Variable expression that can be embedded in outer expression(s).
+	fmt.Printf(">>> outScope == nil? %v\n", outScope == nil)
+
 	if outScope == nil {
 		return b.factory.ConstructVariable(col.id)
 	}
@@ -329,12 +341,16 @@ func (b *Builder) finishBuildScalarRef(
 	if isOuterColumn {
 		// Avoid synthesizing a new column if possible.
 		existing := outScope.findExistingCol(col, false /* allowSideEffects */)
+		fmt.Printf(">>> existing %v outCol %v\n", existing, outCol)
+
 		if existing == nil || existing == outCol {
 			if outCol.name.IsAnonymous() {
 				outCol.name = col.name
 			}
 			group := b.factory.ConstructVariable(col.id)
 			b.populateSynthesizedColumn(outCol, group)
+			fmt.Printf(">>> FINAL %v\n", outCol.id)
+
 			return group
 		}
 
