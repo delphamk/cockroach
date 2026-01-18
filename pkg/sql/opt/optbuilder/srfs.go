@@ -7,6 +7,7 @@ package optbuilder
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/memo"
@@ -35,6 +36,8 @@ type srf struct {
 
 // Walk is part of the tree.Expr interface.
 func (s *srf) Walk(v tree.Visitor) tree.Expr {
+	fmt.Printf("yyyyyyyyyy srf WALK\n")
+
 	return s
 }
 
@@ -42,6 +45,8 @@ func (s *srf) Walk(v tree.Visitor) tree.Expr {
 func (s *srf) TypeCheck(
 	_ context.Context, ctx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+	fmt.Printf("xxxxxxxxxxxxxxxxxx srf TypeCheck\n")
+
 	if ctx.Properties.IsSet(tree.RejectGenerators) {
 		// srf replacement can happen before type-checking, so we need to check
 		// invalid usage here.

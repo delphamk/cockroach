@@ -7,6 +7,7 @@ package optbuilder
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/opt"
 	"github.com/cockroachdb/cockroach/pkg/sql/opt/memo"
@@ -37,6 +38,12 @@ func (s *sqlFnInfo) Walk(v tree.Visitor) tree.Expr {
 func (s *sqlFnInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+	fmt.Printf("xxxxxxxxx sqlFnInfo TypeCheck\n")
+
+	err := semaCtx.CheckFunctionClass(s.def.Name, tree.SQLClass)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := s.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}

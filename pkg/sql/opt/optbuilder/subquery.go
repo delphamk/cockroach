@@ -227,6 +227,8 @@ func (sub *subquery) Eval(_ context.Context, _ tree.ExprEvaluator) (tree.Datum, 
 // It stores the resulting relational expression in s.node, and also updates
 // s.cols and s.ordering with the output columns and ordering of the subquery.
 func (sub *subquery) buildSubquery(desiredTypes []*types.T) {
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> buildSubquery\n")
+
 	if sub.scope.replaceSRFs {
 		// We need to save and restore the previous value of the replaceSRFs field in
 		// case we are recursively called within a subquery context.

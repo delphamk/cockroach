@@ -7,6 +7,7 @@ package tree
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -530,6 +531,14 @@ func (fd *ResolvedFunctionDefinition) GetClass() (FunctionClass, error) {
 		}
 	}
 	return ret, nil
+}
+
+func (fd *ResolvedFunctionDefinition) GetClassString() string {
+	cls,err := fd.GetClass()
+	if err!=nil{
+		return fmt.Sprintf("%s",err)
+	}
+	return cls.String()
 }
 
 // GetReturnLabel returns function ReturnLabel by checking each overload and

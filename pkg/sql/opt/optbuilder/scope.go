@@ -1142,7 +1142,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		expr = t.Walk(s)
 
-		fmt.Printf("\t\t\t>>> pre walk done %v\n", c)
+		fmt.Printf("\t>>> pre walk done %v\n", c)
 
 		t = expr.(*tree.FuncExpr)
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
@@ -1165,42 +1165,36 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 				if !ok {
 					panic("not a FuncExpr")
 				} else {
-					fmt.Printf(">>> newT %T %q\n", newT, newT.String())
+					// fmt.Printf(">>> newT %T %q\n", newT, newT.String())
 
 					if len(newT.Exprs) > 0 {
-						fmt.Printf(">>> newT.child %T %q\n", newT.Exprs[0], newT.Exprs[0].String())
-
+						// fmt.Printf(">>> newT.child %T %q\n", newT.Exprs[0], newT.Exprs[0].String())
 					}
 					t = newT
+					o := t.ResolvedOverload()
+					oStr := "NIL"
+					if o != nil {
+						oStr = o.Class.String()
+					}
+					fmt.Printf("------------------OVERLOAD=%s------------------%T,%s------------------\n", oStr, t, def.GetClassString())
+
 				}
 			}
 
 		}
 
-		if isGenerator(def) && s.replaceSRFs {
+		if isGenerator(def) && s.replaceSRFs { //  && s.replaceSRFs
+			// if isGenerator(def) { //  && s.replaceSRFs
 			test1()
 			expr = s.replaceSRF(t, def)
 			break
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
-			// p := s.builder.semaCtx.Properties
-			// defer s.builder.semaCtx.Properties.Restore(p)
-			fmt.Printf(">>> isAggregate\n")
 
 			test1()
 
-			// fmt.Printf(">>> PREE replaceAggregate TYPE %T %q\n", t, t.String())
-			// for _, e := range t.Exprs {
-			// 	fmt.Printf(">>> PREE replaceAggregate TYPE [E] %T %q\n", e, e.String())
-			// }
-			// // fmt.Printf(">>> subquery? %v\n", s.builder.subquery != nil)
-
 			expr = s.replaceAggregate(t, def)
-
-			// fmt.Printf("ttttttttt>>> replaceAggregate TYPE %T %q\n", expr, expr.String())
-
-			// property should be set here.
 
 			break
 		}
@@ -1217,6 +1211,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			break
 		}
 		test1()
+		fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> nothing!! replaceSRFs=%v\n", s.replaceSRFs)
 
 	case *tree.ArrayFlatten:
 		if sub, ok := t.Subquery.(*tree.Subquery); ok {
@@ -1271,6 +1266,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 // the srfs in the s.srfs slice. See Builder.buildProjectSet in srfs.go for
 // more details.
 func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) *srf {
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceSRF!!\n")
+
 	// We need to save and restore the previous value of the field in
 	// semaCtx in case we are recursively called within a subquery
 	// context.
@@ -1354,6 +1351,8 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceAggregate!!\n")
+
 	// f, def = s.replaceCount(f, def)
 
 	// We need to save and restore the previous value of the field in
@@ -1473,6 +1472,8 @@ func (s *scope) constructWindowDef(def tree.WindowDef) tree.WindowDef {
 }
 
 func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceWindowFn!!\n")
+
 	// f, def = s.replaceCount(f, def)
 
 	if err := tree.CheckIsWindowOrAgg(def); err != nil {
@@ -1573,6 +1574,8 @@ func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefi
 // replaceSQLFn replaces a tree.SQLClass function with a sqlFnInfo struct. See
 // comments above tree.SQLClass and sqlFnInfo for details.
 func (s *scope) replaceSQLFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
+	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceSQLFn!!\n")
+
 	// We need to save and restore the previous value of the field in
 	// semaCtx in case we are recursively called within a subquery
 	// context.
