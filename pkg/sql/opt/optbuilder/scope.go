@@ -1183,9 +1183,16 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		}
 
-		if isGenerator(def) && s.replaceSRFs { //  && s.replaceSRFs
-			// if isGenerator(def) { //  && s.replaceSRFs
+		// if isGenerator(def) && s.replaceSRFs {
+		// 	test1()
+		// 	expr = s.replaceSRF(t, def)
+		// 	break
+		// }
+
+		if isGenerator(def) && s.replaceSRFs {
+
 			test1()
+
 			expr = s.replaceSRF(t, def)
 			break
 		}
@@ -1210,6 +1217,17 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			expr = s.replaceSQLFn(t, def)
 			break
 		}
+
+		if isGenerator(def) && s.replaceSRFs == false {
+			test1()
+			fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> nothisGeneratoring!! FALSE replaceSRFs=%v\n", s.replaceSRFs)
+			err := s.builder.semaCtx.CheckFunctionClass(def.Name, tree.GeneratorClass)
+			if err != nil {
+				panic(err)
+			}
+			break
+		}
+
 		test1()
 		fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> nothing!! replaceSRFs=%v\n", s.replaceSRFs)
 
@@ -1352,6 +1370,7 @@ func isOrderedSetAggregate(
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
 	fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceAggregate!!\n")
+	defer fmt.Printf("DONE----->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> replaceAggregate!!\n")
 
 	// f, def = s.replaceCount(f, def)
 
@@ -1398,6 +1417,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	fmt.Printf(">>> agg walk!!\n")
 
 	expr := f.Walk(s)
+	fmt.Printf(">>> DONE agg walk!!\n")
 
 	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will

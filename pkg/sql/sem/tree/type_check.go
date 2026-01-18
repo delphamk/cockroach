@@ -1586,6 +1586,12 @@ func (expr *FuncExpr) TypeCheck(
 	if overloadImpl.OnTypeCheck != nil {
 		overloadImpl.OnTypeCheck()
 	}
+	// DOESNT WORK.
+	// err = semaCtx.CheckFunctionClass(def.Name, GeneratorClass)
+	// if err != nil {
+	// 	// panic(err)
+	// 	return nil, err
+	// }
 	return expr, nil
 }
 
