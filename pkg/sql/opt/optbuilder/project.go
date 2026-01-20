@@ -308,7 +308,7 @@ func (b *Builder) finishBuildScalarRef(
 	col *scopeColumn, inScope, outScope *scope, outCol *scopeColumn, colRefs *opt.ColSet,
 ) (out opt.ScalarExpr) {
 
-	fmt.Printf("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
+	// fmt.Printf("\n\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n")
 	// fmt.Printf(">>> finishBuildScalarRef col.id=%v colRefs=%s outCol=%v\n", col.id, colRefs, outCol.id)
 
 

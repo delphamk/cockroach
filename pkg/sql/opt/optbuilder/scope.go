@@ -1155,6 +1155,31 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			fmt.Printf("\n>>> START %v EARLY_TYPE_CHECK \texpr=%q\n", c, t)
 			defer fmt.Printf(">>> END %v EARLY_TYPE_CHECK\n\n", c)
 
+			// Make a copy of f so we can modify it if needed.
+			fCopy := *t
+			// Override ordered-set aggregates to use their impl counterparts.
+			if orderedSetDef, found := isOrderedSetAggregate(def); found {
+				// Ensure that the aggregation is well formed.
+				if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
+					panic(pgerror.Newf(
+						pgcode.InvalidFunctionDefinition,
+						"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
+				}
+
+				// Override function definition.
+				def = orderedSetDef
+				fCopy.Func.FunctionReference = orderedSetDef
+
+				// Copy Exprs slice.
+				oldExprs := t.Exprs
+				fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+				copy(fCopy.Exprs, oldExprs)
+
+				// Add implicit column to the input expressions.
+				fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
+				t = &fCopy
+			}
+
 			x := t
 			typedFuncX, err := tree.TypeCheck(s.builder.ctx, x, s.builder.semaCtx, types.Any)
 			if err != nil {
@@ -1182,12 +1207,6 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			}
 
 		}
-
-		// if isGenerator(def) && s.replaceSRFs {
-		// 	test1()
-		// 	expr = s.replaceSRF(t, def)
-		// 	break
-		// }
 
 		if isGenerator(def) && s.replaceSRFs {
 
@@ -1386,29 +1405,29 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	s.builder.semaCtx.Properties.Require("aggregate",
 		tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
 
-	// Make a copy of f so we can modify it if needed.
-	fCopy := *f
-	// Override ordered-set aggregates to use their impl counterparts.
-	if orderedSetDef, found := isOrderedSetAggregate(def); found {
-		// Ensure that the aggregation is well formed.
-		if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
-			panic(pgerror.Newf(
-				pgcode.InvalidFunctionDefinition,
-				"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
-		}
+	// // Make a copy of f so we can modify it if needed.
+	// fCopy := *f
+	// // Override ordered-set aggregates to use their impl counterparts.
+	// if orderedSetDef, found := isOrderedSetAggregate(def); found {
+	// 	// Ensure that the aggregation is well formed.
+	// 	if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
+	// 		panic(pgerror.Newf(
+	// 			pgcode.InvalidFunctionDefinition,
+	// 			"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
+	// 	}
 
-		// Override function definition.
-		def = orderedSetDef
-		fCopy.Func.FunctionReference = orderedSetDef
+	// 	// Override function definition.
+	// 	def = orderedSetDef
+	// 	fCopy.Func.FunctionReference = orderedSetDef
 
-		// Copy Exprs slice.
-		oldExprs := f.Exprs
-		fCopy.Exprs = make(tree.Exprs, len(oldExprs))
-		copy(fCopy.Exprs, oldExprs)
+	// 	// Copy Exprs slice.
+	// 	oldExprs := f.Exprs
+	// 	fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+	// 	copy(fCopy.Exprs, oldExprs)
 
-		// Add implicit column to the input expressions.
-		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
-	}
+	// 	// Add implicit column to the input expressions.
+	// 	fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
+	// }
 
 	// convert := func(e *tree.FuncExpr) tree.Expr {
 	// 	return e
