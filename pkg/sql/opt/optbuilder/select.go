@@ -1247,7 +1247,7 @@ func (b *Builder) buildSelectClause(
 
 	var having opt.ScalarExpr
 	needsAgg := b.needsAggregation(sel, fromScope)
-	fmt.Printf(">>> needsAgg %v\n", needsAgg)
+	// fmt.Printf(">>> needsAgg %v\n", needsAgg)
 
 	if needsAgg {
 		// Grouping columns must be built before building the projection list so

@@ -320,17 +320,17 @@ func (b *Builder) finishBuildScalarRef(
 
 	// Collect the outer columns of the current subquery, if any.
 	isOuterColumn := inScope == nil || inScope.isOuterColumn(col.id)
-	fmt.Printf(">>> isOuterColumn %v inScope == nil? %v\n", isOuterColumn, inScope == nil)
+	// fmt.Printf(">>> isOuterColumn %v inScope == nil? %v\n", isOuterColumn, inScope == nil)
 
 	if isOuterColumn && b.subquery != nil {
-		fmt.Printf(">>>>>>>>> ADDING TO outerCols. col.id=%v\n", col.id)
+		// fmt.Printf(">>>>>>>>> ADDING TO outerCols. col.id=%v\n", col.id)
 
 		b.subquery.outerCols.Add(col.id)
 	}
 
 	// If this is not a projection context, then wrap the column reference with
 	// a Variable expression that can be embedded in outer expression(s).
-	fmt.Printf(">>> outScope == nil? %v\n", outScope == nil)
+	// fmt.Printf(">>> outScope == nil? %v\n", outScope == nil)
 
 	if outScope == nil {
 		return b.factory.ConstructVariable(col.id)
