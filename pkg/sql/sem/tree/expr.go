@@ -1573,6 +1573,10 @@ func typeDisplaysCollate(typ *types.T) bool {
 
 // NewTypedCastExpr returns a new CastExpr that is verified to be well-typed.
 func NewTypedCastExpr(expr TypedExpr, typ *types.T) *CastExpr {
+	// fmt.Printf(">>> cast expr stack: %s \n", debug.Stack())
+
+	fmt.Printf(">>> NewTypedCastExpr! expr %s TYPE=%T typ=%s\n", expr, expr, typ)
+
 	node := &CastExpr{Expr: expr, Type: typ, SyntaxMode: CastShort}
 	node.typ = typ
 	return node
@@ -1809,11 +1813,14 @@ func (node *Subquery) String() string         { return AsString(node) }
 func (node *RoutineExpr) String() string      { return AsString(node) }
 func (node *Tuple) String() string            { return AsString(node) }
 func (node *TupleStar) String() string        { return AsString(node) }
-func (node *AnnotateTypeExpr) String() string { return AsString(node) }
-func (node *UnaryExpr) String() string        { return AsString(node) }
-func (node DefaultVal) String() string        { return AsString(node) }
-func (node PartitionMaxVal) String() string   { return AsString(node) }
-func (node PartitionMinVal) String() string   { return AsString(node) }
-func (node *Placeholder) String() string      { return AsString(node) }
-func (node dNull) String() string             { return AsString(node) }
-func (list *NameList) String() string         { return AsString(list) }
+func (node *AnnotateTypeExpr) String() string {
+	// fmt.Printf(">>> AnnotateTypeExpr String() %s\n", node.Type)
+	return AsString(node)
+}
+func (node *UnaryExpr) String() string      { return AsString(node) }
+func (node DefaultVal) String() string      { return AsString(node) }
+func (node PartitionMaxVal) String() string { return AsString(node) }
+func (node PartitionMinVal) String() string { return AsString(node) }
+func (node *Placeholder) String() string    { return AsString(node) }
+func (node dNull) String() string           { return AsString(node) }
+func (list *NameList) String() string       { return AsString(list) }

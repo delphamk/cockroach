@@ -1041,6 +1041,7 @@ func printStack() {
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
+	fmt.Printf("\t\t\t\t\t>>> visit_pre: %q type=\"%T\"\n", expr, expr)
 
 	switch t := expr.(type) {
 	case *tree.AllColumnsSelector, *tree.TupleStar:
@@ -1138,22 +1139,22 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		t, def = s.replaceCount(t, def)
 		count++
 		c := count
-		fmt.Printf("\t\t\t>>> pre walk %v\n", c)
+		// fmt.Printf("\t\t\t>>> pre walk %v\n", c)
 
 		expr = t.Walk(s)
 
-		fmt.Printf("\t>>> pre walk done %v\n", c)
+		// fmt.Printf("\t>>> pre walk done %v\n", c)
 
 		t = expr.(*tree.FuncExpr)
 		defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
-		test1 := func() {
-			// if true {
-			// 	return
-			// }
+		test1 := func() { // here
+			if true {
+				// return
+			}
 
 			fmt.Printf("\n>>> START %v EARLY_TYPE_CHECK \texpr=%q\n", c, t)
-			defer fmt.Printf(">>> END %v EARLY_TYPE_CHECK\n\n", c)
+			defer fmt.Printf(">>> END %v EARLY_TYPE_CHECK. expr=%q\n\n", c, t)
 
 			// Make a copy of f so we can modify it if needed.
 			fCopy := *t
@@ -1288,6 +1289,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 	// Reset the desired number of columns since if the subquery is a child of
 	// any other expression, type checking will verify the number of columns.
 	s.columns = -1
+	// fmt.Printf(">>> pre retrun expr=%q type=%T\n", expr, expr)
+
 	return true, expr
 }
 

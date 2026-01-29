@@ -224,7 +224,8 @@ func (a *aggregateInfo) Walk(v tree.Visitor) tree.Expr { // here
 func (a *aggregateInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
-	fmt.Printf("xxxxxxxxx aggregateInfo TypeCheck\n")
+	fmt.Printf("xxxxxxxxxxxxxxxxxx aggregateInfo TypeCheck\n")
+	defer fmt.Printf("xxxxxxxxxxxxxxxxxx DONE aggregateInfo TypeCheck\n")
 
 	if _, err := a.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err

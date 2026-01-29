@@ -8,6 +8,7 @@ package tree
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -478,6 +479,8 @@ func (expr *BinaryExpr) TypeCheck(
 func (expr *CaseExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
+	fmt.Printf(">>> !!!!!!! TypeCheck CaseExpr=%q \n", expr)
+
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)
 		semaCtx.Properties.Ancestors.Push(ConditionalAncestor)
@@ -789,9 +792,11 @@ func (expr *IndirectionExpr) TypeCheck(
 }
 
 // TypeCheck implements the Expr interface.
-func (expr *AnnotateTypeExpr) TypeCheck(
+func (expr *AnnotateTypeExpr) TypeCheck( // here
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
+	fmt.Printf("!!!!!!!!!!!!!!!TypeCheck AnnotateTypeExpr expr=%q\n", expr)
+
 	annotateType, err := ResolveType(ctx, expr.Type, semaCtx.GetTypeResolver())
 	if err != nil {
 		return nil, err
@@ -817,6 +822,8 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("!!!!!!!!!!!!!!! returning subExpr: %q type=%T ResolvedType=%v annotateType=%v\n", subExpr, subExpr, subExpr.ResolvedType(), annotateType)
+
 	return subExpr, nil
 }
 
@@ -978,12 +985,20 @@ func (expr *CoalesceExpr) TypeCheck(
 func (expr *ComparisonExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
+	fmt.Printf("-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ComparisonExpr = %q\n", expr)
+	defer fmt.Printf("-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_ DONE ComparisonExpr = %q\n", expr)
+
+	fmt.Printf(">>> ComparisonExpr.Left= %q\n", expr.Left)
+
 	var leftTyped, rightTyped TypedExpr
 	var cmpOp *CmpOp
 	var cmpOpSym treecmp.ComparisonOperatorSymbol
 	var alwaysNull bool
 	var err error
 	if expr.Operator.Symbol.HasSubOperator() {
+		for i := 0; i < 10; i++ {
+			fmt.Printf(">>> HasSubOperator!!! \n")
+		}
 		leftTyped, rightTyped, cmpOp, alwaysNull, err = typeCheckComparisonOpWithSubOperator(
 			ctx,
 			semaCtx,
@@ -994,6 +1009,8 @@ func (expr *ComparisonExpr) TypeCheck(
 		)
 		cmpOpSym = expr.SubOperator.Symbol
 	} else {
+		fmt.Printf(">>> NO ------ HasSubOperator!!! \n")
+
 		leftTyped, rightTyped, cmpOp, alwaysNull, err = typeCheckComparisonOp(
 			ctx,
 			semaCtx,
@@ -1267,12 +1284,13 @@ func (expr *FuncExpr) typeCheckWithFuncAncestor(semaCtx *SemaContext, fn func() 
 func (expr *FuncExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
-	fmt.Printf(">>> TypeCheck FuncExpr expr=%q\n", expr)
-
+	fmt.Printf(">>> TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK FuncExpr expr=%q desired=%q\n", expr, desired)
+	defer fmt.Printf(">>> DONE TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK FuncExpr expr=%q desired=%q\n", expr, desired)
 	if semaCtx != nil && semaCtx.Properties.RoutineUseResolvedType &&
 		expr.typ != nil && !expr.typ.IsWildcardType() {
 		// Don't overwrite the resolved properties for a routine if the routine has
 		// already been resolved (and we are in a context that needs this behavior).
+		fmt.Printf(">>> ROUTINE ALREADY RESOLVED!! \n")
 		return expr, nil
 	}
 
@@ -1392,7 +1410,11 @@ func (expr *FuncExpr) TypeCheck(
 		return nil, err
 	}
 	if funcCls == AggregateClass {
+		fmt.Printf("######################## LENGTH(s.typedExprs): %v \n", len(s.typedExprs))
+
 		for i := range s.typedExprs {
+			fmt.Printf("########################  s.typedExprs[i] family = %v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+
 			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
 				var filtered intsets.Fast
 				for j, ok := notCalledOnNullInputFns.Next(0); ok; j, ok = notCalledOnNullInputFns.Next(j + 1) {
@@ -1407,9 +1429,15 @@ func (expr *FuncExpr) TypeCheck(
 
 					// Cast the expression to a string so the execution engine will find
 					// the correct overload.
-					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String)
+					fmt.Printf("######################## TYPE CHECK FUNCEXPR CALLING NewTypedCastExpr\n")
+					fmt.Printf("ZZZZZZZZZZZZZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+
+					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String) // here defaulting to string
+					// s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.Float) // here defaulting to string
 				}
 			}
+			fmt.Printf("ZZZZZZZZZZZZZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+
 		}
 		truncated := s.overloadIdxs[:0]
 		for _, idx := range s.overloadIdxs {
@@ -2594,6 +2622,9 @@ func typeCheckComparisonOp(
 	left, right Expr,
 	params ...bool,
 ) (_ TypedExpr, _ TypedExpr, _ *CmpOp, alwaysNull bool, _ error) {
+	fmt.Printf(">>> typeCheckComparisonOp: %q\n", op)
+	defer fmt.Printf(">>> END typeCheckComparisonOp\n")
+
 	disallowSwitch := false
 	if len(params) > 0 {
 		disallowSwitch = true
@@ -2602,6 +2633,9 @@ func typeCheckComparisonOp(
 	// with its nested expression in our plan. This makes type checking cleaner.
 	left = StripParens(left)
 	right = StripParens(right)
+
+	fmt.Printf(">>> LEFT: %q %T\n", left, left)
+	fmt.Printf(">>> RIGHT: %q %T\n", right, right)
 
 	foldedOp, foldedLeft, foldedRight, switched, _ := FoldComparisonExpr(op, left, right)
 	ops := CmpOps[foldedOp.Symbol]
@@ -2617,6 +2651,8 @@ func typeCheckComparisonOp(
 	// Do an initial check for TEXT @@ XXX special cases which might need to
 	// inject a to_tsvector or plainto_tsquery function call.
 	if op.Symbol == treecmp.TSMatches {
+		fmt.Printf("++++++++++++++++++++++++++++++ treecmp.TSMatches\n")
+
 		if switched {
 			// The order of operators matters as to which function call to apply.
 			foldedLeft, foldedRight = foldedRight, foldedLeft
@@ -2645,6 +2681,7 @@ func typeCheckComparisonOp(
 	handleTupleTypeMismatch := false
 	switch {
 	case foldedOp.Symbol == treecmp.In && rightIsTuple:
+		fmt.Printf("++++++++++++++++++++++++++++++ switch 1\n")
 		rightTuple := foldedRight.(*Tuple)
 		sameTypeExprs := make([]Expr, len(rightTuple.Exprs)+1)
 		sameTypeExprs[0] = foldedLeft
@@ -2678,6 +2715,7 @@ func typeCheckComparisonOp(
 		return typedLeft, rightTuple, fn, false, nil
 
 	case foldedOp.Symbol == treecmp.In && rightIsSubquery:
+		fmt.Printf("++++++++++++++++++++++++++++++ switch 2\n")
 		typedLeft, err = foldedLeft.TypeCheck(ctx, semaCtx, types.AnyElement)
 		if err != nil {
 			sigWithErr := redact.Sprintf(compExprsFmt, left, op, right, err)
@@ -2713,6 +2751,7 @@ func typeCheckComparisonOp(
 		return typedLeft, typedRight, fn, false, nil
 
 	case leftIsTuple && rightIsTuple:
+		fmt.Printf("++++++++++++++++++++++++++++++ switch 3\n")
 		fn, ok := ops.LookupImpl(types.AnyTuple, types.AnyTuple)
 		if !ok {
 			sig := redact.Sprintf(compSignatureFmt, types.AnyTuple, op, types.AnyTuple)
@@ -2727,6 +2766,7 @@ func typeCheckComparisonOp(
 		return typedLeft, typedRight, fn, false, nil
 
 	case leftIsTuple || rightIsTuple:
+		fmt.Printf("++++++++++++++++++++++++++++++ switch 4\n")
 		var errLeft, errRight error
 		// Tuple must compare with a tuple type, as handled above.
 		typedLeft, errLeft = foldedLeft.TypeCheck(ctx, semaCtx, types.AnyElement)
@@ -2739,6 +2779,7 @@ func typeCheckComparisonOp(
 			handleTupleTypeMismatch = true
 		}
 	case tsMatchesWithText:
+		fmt.Printf("++++++++++++++++++++++++++++++ switch 5\n")
 		// Apply rules from:
 		// https://www.postgresql.org/docs/current/textsearch-intro.html#TEXTSEARCH-MATCHING
 		// Perform the following type conversions:
@@ -2798,15 +2839,22 @@ func typeCheckComparisonOp(
 	}
 	if !disallowSwitch && !placeholderComparison && !columnComparison {
 		_, _, err := typeCheckSameTypedExprs(ctx, semaCtx, types.AnyElement, foldedLeft, foldedRight)
+		fmt.Printf(">>> typeCheckSameTypedExprs1 err %q \n", err)
 		if err != nil {
 			_, _, err = typeCheckSameTypedExprs(ctx, semaCtx, types.AnyElement, foldedRight, foldedLeft)
+			fmt.Printf(">>> typeCheckSameTypedExprs2 err %q \n", err)
 			if err == nil {
 				s = getOverloadTypeChecker(ops, foldedRight, foldedLeft)
 				switched = !switched
 			}
 		}
+	} else {
+		fmt.Printf(">>> !disallowSwitch %v \n", !disallowSwitch)
+		fmt.Printf(">>> !placeholderComparison %v \n", !placeholderComparison)
+		fmt.Printf(">>> !columnComparison %v \n", !columnComparison)
 	}
 	if s == nil {
+		fmt.Printf(">>> S IS NIL!! \n")
 		if disallowSwitch && switched {
 			s = getOverloadTypeChecker(ops, foldedRight, foldedLeft)
 			switched = false
@@ -2821,13 +2869,20 @@ func typeCheckComparisonOp(
 	typedSubExprs := s.typedExprs
 
 	leftExpr, rightExpr := typedSubExprs[0], typedSubExprs[1]
+	fmt.Printf(">>> switched %v leftExpr=%q(%T) rightExpr=%q\n", switched, leftExpr, leftExpr, rightExpr)
+
 	if switched {
 		leftExpr, rightExpr = rightExpr, leftExpr
 	}
 	leftReturn := leftExpr.ResolvedType()
 	rightReturn := rightExpr.ResolvedType()
+
 	leftFamily = leftReturn.Family()
 	rightFamily = rightReturn.Family()
+
+	fmt.Printf(">>> leftFamily2: %q\n", leftFamily)
+	fmt.Printf(">>> rightFamily2: %q\n", rightFamily)
+	// fmt.Printf(">>> stack: %s \n", debug.Stack())
 
 	// Return early if at least one overload is possible, NULL is an argument,
 	// and none of the overloads accept NULL.
@@ -2854,6 +2909,7 @@ func typeCheckComparisonOp(
 	leftIsGeneric := leftFamily == types.CollatedStringFamily || leftFamily == types.ArrayFamily || leftFamily == types.EnumFamily
 	rightIsGeneric := rightFamily == types.CollatedStringFamily || rightFamily == types.ArrayFamily || rightFamily == types.EnumFamily
 	genericComparison := leftIsGeneric && rightIsGeneric
+	fmt.Printf(">>> ???? leftIsGeneric %v rightIsGeneric %v genericComparison %v handleTupleTypeMismatch %v\n", leftIsGeneric, rightIsGeneric, genericComparison, handleTupleTypeMismatch)
 
 	typeMismatch := false
 	if (genericComparison || handleTupleTypeMismatch) && !nullComparison {
@@ -2862,6 +2918,8 @@ func typeCheckComparisonOp(
 		// sides is NULL.
 		typeMismatch = !leftReturn.Equivalent(rightReturn)
 	}
+
+	fmt.Printf(">>> ???? len=%v typeMismatch=%v\n", len(s.overloadIdxs), typeMismatch)
 
 	// Throw a typing error if overload resolution found either no compatible candidates
 	// or if it found an ambiguity.
@@ -2875,14 +2933,25 @@ func typeCheckComparisonOp(
 				return nil, nil, nil, false,
 					pgerror.Newf(pgcode.InvalidParameterValue, invalidCompErrFmt, "enum", sig)
 			}
-			return nil, nil, nil, false,
-				pgerror.Newf(pgcode.InvalidParameterValue, unsupportedCompErrFmt, sig)
+
+			err := pgerror.Newf(pgcode.InvalidParameterValue, "here is errorr: %s. len=%v typeMismatch=%v", sig, len(s.overloadIdxs), typeMismatch)
+			fmt.Printf(">>> typeCheckComparisonOp error: %q\n", err)
+
+			if false {
+				stack := debug.Stack()
+				fmt.Printf(">>> stack: %s\n", stack)
+			}
+
+			return nil, nil, nil, false, err
+
 		}
 		fnsStr := formatCandidates(op.String(), s.overloads, s.overloadIdxs)
 		err := pgerror.Newf(pgcode.AmbiguousFunction, ambiguousCompErrFmt, sig)
 		err = errors.WithHintf(err, candidatesHintFmt, fnsStr)
 		return nil, nil, nil, false, err
 	}
+	fmt.Printf(">>> FINAL RETURN\n")
+
 	return leftExpr, rightExpr, ops.overloads[s.overloadIdxs[0]], false, nil
 }
 
@@ -2969,14 +3038,19 @@ func typeCheckSameTypedExprs(
 
 	switch {
 	case resolvableIdxs.Empty() && constIdxs.Empty():
+		fmt.Printf("========= CASE 1 \n")
+
 		typ, err := typeCheckSameTypedPlaceholders(s, desired)
 		if err != nil {
 			return nil, nil, err
 		}
 		return typedExprs, typ, nil
 	case resolvableIdxs.Empty():
+		fmt.Printf("========= CASE 2 \n")
+
 		return typeCheckConstsAndPlaceholdersWithDesired(s, desired)
 	default:
+		fmt.Printf("========= CASE 3 desired = %s\n", desired)
 		firstValidIdx := -1
 		candidateType := types.Unknown
 		for i, ok := s.resolvableIdxs.Next(0); ok; i, ok = s.resolvableIdxs.Next(i + 1) {
@@ -2985,12 +3059,16 @@ func typeCheckSameTypedExprs(
 				return nil, nil, err
 			}
 			typedExprs[i] = typedExpr
+			fmt.Printf(">>>!!!!  typedExpr.ResolvedType() %v \n", typedExpr.ResolvedType())
+
 			if returnType := typedExpr.ResolvedType(); returnType.Family() != types.UnknownFamily {
 				candidateType = returnType
 				firstValidIdx = i
 				break
 			}
 		}
+
+		// fmt.Printf(">>> candidateType1 %v\n", candidateType)
 
 		if candidateType.Family() == types.UnknownFamily {
 			// We got to the end without finding a non-null expression.
@@ -3010,6 +3088,7 @@ func typeCheckSameTypedExprs(
 				return typedExprs, types.Unknown, nil
 			}
 		}
+		// fmt.Printf(">>> candidateType2 %v\n", candidateType)
 
 		for i, ok := s.resolvableIdxs.Next(firstValidIdx + 1); ok; i, ok = s.resolvableIdxs.Next(i + 1) {
 			typedExpr, err := exprs[i].TypeCheck(ctx, semaCtx, candidateType)
@@ -3033,6 +3112,8 @@ func typeCheckSameTypedExprs(
 			}
 			typedExprs[i] = typedExpr
 		}
+		// fmt.Printf(">>> candidateType3 %v\n", candidateType)
+
 		if !constIdxs.Empty() {
 			if _, err := typeCheckSameTypedConsts(s, candidateType, true); err != nil {
 				return nil, nil, err
