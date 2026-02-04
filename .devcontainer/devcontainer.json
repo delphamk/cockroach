@@ -5,10 +5,11 @@
 		"ghcr.io/devcontainers/features/common-utils:2": {},
 		"ghcr.io/devcontainers-community/features/bazel:1": {},
 		"ghcr.io/devcontainers/features/go:1": {},
-		"ghcr.io/devcontainers-extra/features/actionlint:1": {},
 		"ghcr.io/devcontainers/features/sshd:1": {
 			"version": "latest"
-		}
+		},
+		"ghcr.io/devcontainers/features/nix:1": {},
+		"ghcr.io/devcontainers-extra/features/actionlint:1": {}
 	},
 	"runArgs": [
 		"--add-host=host.docker.internal:host-gateway"
@@ -16,12 +17,14 @@
 	"containerEnv": {
 		"SHELL": "/bin/zsh"
 	},
-	"forwardPorts": [
-		9999
+	"postCreateCommand": "echo 'build --remote_cache=http://host.docker.internal:9090\ntest --remote_cache=http://host.docker.internal:9090' > ~/.bazelrc && /home/vscode/dots/install-home-manager && /home/vscode/dots/setup",
+	"mounts": [
+		"source=${localEnv:HOME}/dots,target=/home/vscode/dots,type=bind,consistency=cached"
 	],
-	"portsAttributes": {
-		"9999": {
-			"label": "CockroachDB"
-		}
-	}
+	"forwardPorts": [9999],
+    "portsAttributes": {
+        "9999": {
+            "label": "CockroachDB"
+        }
+    }
 }
