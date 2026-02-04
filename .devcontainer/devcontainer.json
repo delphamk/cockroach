@@ -1,0 +1,27 @@
+{
+	"name": "crdb dev container",
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {},
+		"ghcr.io/devcontainers-community/features/bazel:1": {},
+		"ghcr.io/devcontainers/features/go:1": {},
+		"ghcr.io/devcontainers-extra/features/actionlint:1": {},
+		"ghcr.io/devcontainers/features/sshd:1": {
+			"version": "latest"
+		}
+	},
+	"runArgs": [
+		"--add-host=host.docker.internal:host-gateway"
+	],
+	"containerEnv": {
+		"SHELL": "/bin/zsh"
+	},
+	"forwardPorts": [
+		9999
+	],
+	"portsAttributes": {
+		"9999": {
+			"label": "CockroachDB"
+		}
+	}
+}
