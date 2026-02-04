@@ -479,7 +479,7 @@ func (expr *BinaryExpr) TypeCheck(
 func (expr *CaseExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
-	fmt.Printf(">>> !!!!!!! TypeCheck CaseExpr=%q \n", expr)
+	fmt.Printf("\t------>>> !!!!!!!0 TypeCheck CaseExpr=%q desired=%q\n", expr,desired)
 
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)
@@ -1283,7 +1283,7 @@ func (expr *FuncExpr) typeCheckWithFuncAncestor(semaCtx *SemaContext, fn func() 
 // TypeCheck implements the Expr interface.
 func (expr *FuncExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
-) (TypedExpr, error) {
+) (TypedExpr, error) { // FuncExpr
 	fmt.Printf(">>> TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK FuncExpr expr=%q desired=%q\n", expr, desired)
 	defer fmt.Printf(">>> DONE TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK_TYPECHECK FuncExpr expr=%q desired=%q\n", expr, desired)
 	if semaCtx != nil && semaCtx.Properties.RoutineUseResolvedType &&
@@ -1430,13 +1430,13 @@ func (expr *FuncExpr) TypeCheck(
 					// Cast the expression to a string so the execution engine will find
 					// the correct overload.
 					fmt.Printf("######################## TYPE CHECK FUNCEXPR CALLING NewTypedCastExpr\n")
-					fmt.Printf("ZZZZZZZZZZZZZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+					fmt.Printf("111111111111111111 ZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
 
 					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String) // here defaulting to string
 					// s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.Float) // here defaulting to string
 				}
 			}
-			fmt.Printf("ZZZZZZZZZZZZZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+			fmt.Printf("2222222222222222 ZZZZZZZZZZZZZZ AFTER s.typedExprs[i] family=%v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
 
 		}
 		truncated := s.overloadIdxs[:0]

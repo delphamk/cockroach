@@ -1081,11 +1081,17 @@ func (s *overloadTypeChecker) typeCheckOverloadedExprs(
 				break
 			}
 		}
+
+		fmt.Printf(">>> CALLING TYPE CHECK - OVERLOAD. paramDesired='%v' sameType='%v'\n", paramDesired, sameType)
+
 		// Don't allow ambiguous types to be desired, this prevents for instance
 		// AnyCollatedString from trumping the concrete collated type.
 		if sameType != nil {
 			paramDesired = sameType
 		}
+		// paramDesired = types.Float
+		// here desired us now any.
+		// This allows case to cast to String.
 		typ, err := s.exprs[i].TypeCheck(ctx, semaCtx, paramDesired)
 		if err != nil {
 			return err
