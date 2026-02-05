@@ -479,7 +479,8 @@ func (expr *BinaryExpr) TypeCheck(
 func (expr *CaseExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
-	fmt.Printf("\t------>>> !!!!!!!0 TypeCheck CaseExpr=%q desired=%q\n", expr,desired)
+	fmt.Printf("\t------>>> !!!!!!!0 TypeCheck CaseExpr=%q desired=%q\n", expr, desired)
+	fmt.Printf("\t------>>> !!!!!!!0 CASE - ALREADY TYPED? - %v\n", expr.typeAnnotation.typ == nil)
 
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)

@@ -1092,11 +1092,26 @@ func (s *overloadTypeChecker) typeCheckOverloadedExprs(
 		// paramDesired = types.Float
 		// here desired us now any.
 		// This allows case to cast to String.
+
+		// typ, ok := s.exprs[i].(TypedExpr)
+		// fmt.Printf("------->>> ALREADY TYPED? ok = %v typ=%q TYPE %T\n", ok, typ, typ)
+		// var err error
+		// if ok && sameType == nil {
+		// 	s.typedExprs[i] = typ
+		// } else {
+		// 	typ, err = s.exprs[i].TypeCheck(ctx, semaCtx, paramDesired)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
+		
+
 		typ, err := s.exprs[i].TypeCheck(ctx, semaCtx, paramDesired)
 		if err != nil {
 			return err
 		}
 		s.typedExprs[i] = typ
+
 		if typ.ResolvedType().Identical(types.AnyCollatedString) {
 			ambiguousCollatedTypes = true
 		}
