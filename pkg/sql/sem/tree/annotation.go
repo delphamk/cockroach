@@ -5,7 +5,9 @@
 
 package tree
 
-import "github.com/cockroachdb/cockroach/pkg/util/buildutil"
+import (
+	"github.com/cockroachdb/cockroach/pkg/util/buildutil"
+)
 
 // AnnotationIdx is the 1-based index of an annotation. AST nodes that can
 // be annotated store such an index (unique within that AST).

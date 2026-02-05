@@ -1,75 +1,147 @@
+# clear && ./dev test pkg/sql/opt/optbuilder:optbuilder_test --ignore-cache -v --filter TestBuilder/aggregate 
 
 
 exec-ddl
 CREATE TABLE t0(c0 INT)
 ----
 
+
 build format=(show-types,show-scalars)
-SELECT * FROM t0 GROUP BY t0.c0 HAVING min((CASE WHEN false THEN NULL END):::FLOAT) IS NOT NAN
+SELECT min((CASE WHEN false THEN NULL END):::FLOAT) IS NOT NAN
 ----
-error (22023): here is errorr: <string> != <decimal>. len=0 typeMismatch=false
+project
+ ├── columns: "?column?":3(bool)
+ ├── scalar-group-by
+ │    ├── columns: min:2(float)
+ │    ├── project
+ │    │    ├── columns: column1:1(float)
+ │    │    ├── values
+ │    │    │    └── tuple [type=tuple]
+ │    │    └── projections
+ │    │         └── case [as=column1:1, type=float]
+ │    │              ├── true [type=bool]
+ │    │              ├── when [type=float]
+ │    │              │    ├── false [type=bool]
+ │    │              │    └── cast: FLOAT8 [type=float]
+ │    │              │         └── null [type=unknown]
+ │    │              └── null [type=float]
+ │    └── aggregations
+ │         └── min [as=min:2, type=float]
+ │              └── variable: column1:1 [type=float]
+ └── projections
+      └── ne [as="?column?":3, type=bool]
+           ├── variable: min:2 [type=float]
+           └── const: NaN [type=float]
 
-# when casting to float, it is similair but not completely correct.
+
+
+build format=(show-types,show-scalars)
+SELECT min(NULL:::FLOAT)
+----
+scalar-group-by
+ ├── columns: min:2(string)
+ ├── project
+ │    ├── columns: column1:1(string)
+ │    ├── values
+ │    │    └── tuple [type=tuple]
+ │    └── projections
+ │         └── cast: STRING [as=column1:1, type=string]
+ │              └── null [type=unknown]
+ └── aggregations
+      └── min [as=min:2, type=string]
+           └── variable: column1:1 [type=string]
+
+build format=(show-types,show-scalars)
+SELECT min(1:::FLOAT)
+----
+scalar-group-by
+ ├── columns: min:2(float)
+ ├── project
+ │    ├── columns: column1:1(float!null)
+ │    ├── values
+ │    │    └── tuple [type=tuple]
+ │    └── projections
+ │         └── const: 1.0 [as=column1:1, type=float]
+ └── aggregations
+      └── min [as=min:2, type=float]
+           └── variable: column1:1 [type=float]
+
+
+
+# build format=(show-types,show-scalars)
+# SELECT NULL::float
 # ----
 # project
-#  ├── columns: c0:1(int)
-#  └── select
-#       ├── columns: c0:1(int) min:6(float!null)
-#       ├── group-by (hash)
-#       │    ├── columns: c0:1(int) min:6(float)
-#       │    ├── grouping columns: c0:1(int)
-#       │    ├── project
-#       │    │    ├── columns: column5:5(float) c0:1(int)
-#       │    │    ├── scan t0
-#       │    │    │    └── columns: c0:1(int) rowid:2(int!null) crdb_internal_mvcc_timestamp:3(decimal) tableoid:4(oid)
-#       │    │    └── projections
-#       │    │         └── cast: FLOAT8 [as=column5:5, type=float]
-#       │    │              └── case [type=unknown]
-#       │    │                   ├── true [type=bool]
-#       │    │                   ├── when [type=unknown]
-#       │    │                   │    ├── false [type=bool]
-#       │    │                   │    └── null [type=unknown]
-#       │    │                   └── null [type=unknown]
-#       │    └── aggregations
-#       │         └── min [as=min:6, type=float]
-#       │              └── variable: column5:5 [type=float]
-#       └── filters
-#            └── ne [type=bool]
-#                 ├── variable: min:6 [type=float]
-#                 └── const: NaN [type=float]                
+#  ├── columns: float8:1(float)
+#  ├── values
+#  │    └── tuple [type=tuple]
+#  └── projections
+#       └── cast: FLOAT8 [as=float8:1, type=float]
+#            └── null [type=unknown]
 
-# error happens at `pkg/sql/sem/tree/type_check.go:2867`
-# if len(s.overloadIdxs) != 1 || typeMismatch {
-
-# func (expr *AnnotateTypeExpr) TypeCheck(
-# This this store the FLOAT, but it is removed?
-# STRING set as deafault in NewTypedCastExpr
-
-# expected:
+# build format=(show-types,show-scalars)
+# SELECT NULL:::float
 # ----
 # project
-#  ├── columns: c0:1(int)
-#  └── select
-#       ├── columns: c0:1(int) min:6(float!null)
-#       ├── group-by (hash)
-#       │    ├── columns: c0:1(int) min:6(float)
-#       │    ├── grouping columns: c0:1(int)
-#       │    ├── project
-#       │    │    ├── columns: column5:5(float) c0:1(int)
-#       │    │    ├── scan t0
-#       │    │    │    └── columns: c0:1(int) rowid:2(int!null) crdb_internal_mvcc_timestamp:3(decimal) tableoid:4(oid)
-#       │    │    └── projections
-#       │    │         └── case [as=column5:5, type=float]
-#       │    │              ├── true [type=bool]
-#       │    │              ├── when [type=float]
-#       │    │              │    ├── false [type=bool]
-#       │    │              │    └── cast: FLOAT8 [type=float]
-#       │    │              │         └── null [type=unknown]
-#       │    │              └── null [type=float]
-#       │    └── aggregations
-#       │         └── min [as=min:6, type=float]
-#       │              └── variable: column5:5 [type=float]
-#       └── filters
-#            └── ne [type=bool]
-#                 ├── variable: min:6 [type=float]
-#                 └── const: NaN [type=float]
+#  ├── columns: float8:1(unknown)
+#  ├── values
+#  │    └── tuple [type=tuple]
+#  └── projections
+#       └── null [as=float8:1, type=unknown]
+
+# build format=(show-types,show-scalars)
+# SELECT 1:::float
+# ----
+# project
+#  ├── columns: float8:1(float!null)
+#  ├── values
+#  │    └── tuple [type=tuple]
+#  └── projections
+#       └── const: 1.0 [as=float8:1, type=float]
+
+# build format=(show-types,show-scalars)
+# SELECT 1::float
+# ----
+# project
+#  ├── columns: float8:1(float!null)
+#  ├── values
+#  │    └── tuple [type=tuple]
+#  └── projections
+#       └── const: 1.0 [as=float8:1, type=float]
+
+# build format=(show-types,show-scalars)
+# SELECT cast((1:::float) as float)
+# ----
+# project
+#  ├── columns: float8:1(float!null)
+#  ├── values
+#  │    └── tuple [type=tuple]
+#  └── projections
+#       └── const: 1.0 [as=float8:1, type=float]
+
+# build format=(show-types,show-scalars)
+# SELECT min((CASE WHEN false THEN NULL END):::FLOAT) IS NOT NAN
+# ----
+# project
+#  ├── columns: "?column?":3(bool)
+#  ├── scalar-group-by
+#  │    ├── columns: min:2(float)
+#  │    ├── project
+#  │    │    ├── columns: column1:1(float)
+#  │    │    ├── values
+#  │    │    │    └── tuple [type=tuple]
+#  │    │    └── projections
+#  │    │         └── case [as=column1:1, type=float]
+#  │    │              ├── true [type=bool]
+#  │    │              ├── when [type=float]
+#  │    │              │    ├── false [type=bool]
+#  │    │              │    └── cast: FLOAT8 [type=float]
+#  │    │              │         └── null [type=unknown]
+#  │    │              └── null [type=float]
+#  │    └── aggregations
+#  │         └── min [as=min:2, type=float]
+#  │              └── variable: column1:1 [type=float]
+#  └── projections
+#       └── ne [as="?column?":3, type=bool]
+#            ├── variable: min:2 [type=float]
+#            └── const: NaN [type=float]

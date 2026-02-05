@@ -480,7 +480,7 @@ func (expr *CaseExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
 	fmt.Printf("\t------>>> !!!!!!!0 TypeCheck CaseExpr=%q desired=%q\n", expr, desired)
-	fmt.Printf("\t------>>> !!!!!!!0 CASE - ALREADY TYPED? - %v\n", expr.typeAnnotation.typ == nil)
+	fmt.Printf("\t------>>> !!!!!!!0 CASE - ALREADY TYPED? - %v\n", expr.typeAnnotation.typ != nil)
 
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)
@@ -825,6 +825,7 @@ func (expr *AnnotateTypeExpr) TypeCheck( // here
 	}
 	fmt.Printf("!!!!!!!!!!!!!!! returning subExpr: %q type=%T ResolvedType=%v annotateType=%v\n", subExpr, subExpr, subExpr.ResolvedType(), annotateType)
 
+	// return NewTypedCastExpr(subExpr, annotateType), nil
 	return subExpr, nil
 }
 
@@ -1411,10 +1412,9 @@ func (expr *FuncExpr) TypeCheck(
 		return nil, err
 	}
 	if funcCls == AggregateClass {
-		fmt.Printf("######################## LENGTH(s.typedExprs): %v \n", len(s.typedExprs))
 
 		for i := range s.typedExprs {
-			fmt.Printf("########################  s.typedExprs[i] family = %v T=%T\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i])
+			fmt.Printf("########################  s.typedExprs[i] family = %v T=%T  expr=%q\n", s.typedExprs[i].ResolvedType().Family(), s.typedExprs[i], s.typedExprs[i])
 
 			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
 				var filtered intsets.Fast
@@ -1978,7 +1978,13 @@ func (expr PartitionMaxVal) TypeCheck(
 func (expr *NumVal) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
-	return typeCheckConstant(ctx, semaCtx, expr, desired)
+	fmt.Printf("-------------------------NumVal TYPECHECK desired=%q expr=%q\n", desired, expr)
+
+	ret, err := typeCheckConstant(ctx, semaCtx, expr, desired)
+
+	fmt.Printf("--------- ret resolved type = %q TYPE=%T\n", ret.ResolvedType(), ret)
+
+	return ret, err
 }
 
 // TypeCheck implements the Expr interface.

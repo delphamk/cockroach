@@ -2,5 +2,5 @@ build --config=dev
 build --config=lintonbuild
 test --test_tmpdir=/tmp/cockroach
 test --sandbox_add_mount_pair=/tmp
-build --remote_cache=http://127.0.0.1:9090
-build --config=dev
+build --remote_cache=http://host.docker.internal:9090
+--remote_cache=http://host.docker.internal:9090

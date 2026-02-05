@@ -1575,7 +1575,7 @@ func typeDisplaysCollate(typ *types.T) bool {
 func NewTypedCastExpr(expr TypedExpr, typ *types.T) *CastExpr {
 	// fmt.Printf(">>> cast expr stack: %s \n", debug.Stack())
 
-	fmt.Printf(">>> NewTypedCastExpr! expr %s TYPE=%T typ=%s\n", expr, expr, typ)
+	fmt.Printf(">>>++++++++++++++++++++++++++++++ NewTypedCastExpr! expr %s TYPE=%T typ=%s\n", expr, expr, typ)
 
 	node := &CastExpr{Expr: expr, Type: typ, SyntaxMode: CastShort}
 	node.typ = typ
