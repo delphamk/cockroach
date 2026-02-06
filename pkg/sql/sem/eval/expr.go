@@ -7,6 +7,7 @@ package eval
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgerror"
@@ -124,6 +125,13 @@ func (e *evaluator) EvalBinaryExpr(ctx context.Context, expr *tree.BinaryExpr) (
 	return res, err
 }
 
+func (e *evaluator) EvalAnnotateTypeExpr(ctx context.Context, expr *tree.AnnotateTypeExpr) (tree.Datum, error) {
+	fmt.Printf(">>> !!!! EvalAnnotateTypeExpr !!!! expr = %q \n",expr)
+	
+	return expr.TypedInnerExpr().Eval(ctx, e)
+	// return tree.DNull, nil
+}
+
 func (e *evaluator) EvalCaseExpr(ctx context.Context, expr *tree.CaseExpr) (tree.Datum, error) {
 	if expr.Expr != nil {
 		// CASE <val> WHEN <expr> THEN ...
@@ -178,6 +186,7 @@ func (e *evaluator) EvalCastExpr(ctx context.Context, expr *tree.CastExpr) (tree
 
 	// NULL cast to anything is NULL.
 	if d == tree.DNull {
+		// fmt.Printf(">>> CAST NULL expr=%q\n", expr)
 		return d, nil
 	}
 	d = UnwrapDatum(ctx, e.ctx(), d)

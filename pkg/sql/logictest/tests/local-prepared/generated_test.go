@@ -262,6 +262,13 @@ func TestLogic_case_sensitive_names(
 	runLogicTest(t, "case_sensitive_names")
 }
 
+func TestLogic_cast(
+	t *testing.T,
+) {
+	defer leaktest.AfterTest(t)()
+	runLogicTest(t, "cast")
+}
+
 func TestLogic_ccl(
 	t *testing.T,
 ) {

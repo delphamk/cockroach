@@ -1636,6 +1636,8 @@ type AnnotateTypeExpr struct {
 	Type ResolvableTypeReference
 
 	SyntaxMode annotateSyntaxMode
+
+	typeAnnotation
 }
 
 // Format implements the NodeFormatter interface.

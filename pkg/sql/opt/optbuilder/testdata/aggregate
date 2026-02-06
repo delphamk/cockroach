@@ -1,11 +1,6 @@
 # clear && ./dev test pkg/sql/opt/optbuilder:optbuilder_test --ignore-cache -v --filter TestBuilder/aggregate 
 
 
-exec-ddl
-CREATE TABLE t0(c0 INT)
-----
-
-
 build format=(show-types,show-scalars)
 SELECT min((CASE WHEN false THEN NULL END):::FLOAT) IS NOT NAN
 ----
@@ -32,39 +27,6 @@ project
       └── ne [as="?column?":3, type=bool]
            ├── variable: min:2 [type=float]
            └── const: NaN [type=float]
-
-
-
-build format=(show-types,show-scalars)
-SELECT min(NULL:::FLOAT)
-----
-scalar-group-by
- ├── columns: min:2(string)
- ├── project
- │    ├── columns: column1:1(string)
- │    ├── values
- │    │    └── tuple [type=tuple]
- │    └── projections
- │         └── cast: STRING [as=column1:1, type=string]
- │              └── null [type=unknown]
- └── aggregations
-      └── min [as=min:2, type=string]
-           └── variable: column1:1 [type=string]
-
-build format=(show-types,show-scalars)
-SELECT min(1:::FLOAT)
-----
-scalar-group-by
- ├── columns: min:2(float)
- ├── project
- │    ├── columns: column1:1(float!null)
- │    ├── values
- │    │    └── tuple [type=tuple]
- │    └── projections
- │         └── const: 1.0 [as=column1:1, type=float]
- └── aggregations
-      └── min [as=min:2, type=float]
-           └── variable: column1:1 [type=float]
 
 
 

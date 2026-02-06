@@ -1150,7 +1150,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		test1 := func() { // here
 			if true {
-				return
+				// return
 			}
 
 			fmt.Printf("\n>>> START %v EARLY_TYPE_CHECK \texpr=%q\n", c, t)

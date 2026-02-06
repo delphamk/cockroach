@@ -1035,6 +1035,8 @@ FROM defaults_parsed
 			Types:      tree.ParamTypes{{Name: "val", Typ: types.AnyElement}},
 			ReturnType: tree.FixedReturnType(types.String),
 			Fn: func(_ context.Context, _ *eval.Context, args tree.Datums) (tree.Datum, error) {
+				fmt.Printf(">>> CALLING pg_typeof >> %s \n",args[0])
+
 				return tree.NewDString(args[0].ResolvedType().SQLStandardName()), nil
 			},
 			Info:              notUsableInfo,

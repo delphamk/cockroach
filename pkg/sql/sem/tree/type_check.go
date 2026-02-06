@@ -826,7 +826,11 @@ func (expr *AnnotateTypeExpr) TypeCheck( // here
 	fmt.Printf("!!!!!!!!!!!!!!! returning subExpr: %q type=%T ResolvedType=%v annotateType=%v\n", subExpr, subExpr, subExpr.ResolvedType(), annotateType)
 
 	// return NewTypedCastExpr(subExpr, annotateType), nil
-	return subExpr, nil
+	// return subExpr, nil
+
+	expr.Expr = subExpr
+	expr.typ = annotateType
+	return expr, nil
 }
 
 // TypeCheck implements the Expr interface.
