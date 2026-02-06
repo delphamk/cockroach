@@ -8,7 +8,6 @@ package tree
 import (
 	"context"
 	"fmt"
-	"runtime/debug"
 	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/pgwire/pgcode"
@@ -2945,15 +2944,17 @@ func typeCheckComparisonOp(
 					pgerror.Newf(pgcode.InvalidParameterValue, invalidCompErrFmt, "enum", sig)
 			}
 
-			err := pgerror.Newf(pgcode.InvalidParameterValue, "here is errorr: %s. len=%v typeMismatch=%v", sig, len(s.overloadIdxs), typeMismatch)
-			fmt.Printf(">>> typeCheckComparisonOp error: %q\n", err)
+			// err := pgerror.Newf(pgcode.InvalidParameterValue, "here is errorr: %s. len=%v typeMismatch=%v", sig, len(s.overloadIdxs), typeMismatch)
+			// fmt.Printf(">>> typeCheckComparisonOp error: %q\n", err)
 
-			if false {
-				stack := debug.Stack()
-				fmt.Printf(">>> stack: %s\n", stack)
-			}
+			// if false {
+			// 	stack := debug.Stack()
+			// 	fmt.Printf(">>> stack: %s\n", stack)
+			// }
 
-			return nil, nil, nil, false, err
+			// return nil, nil, nil, false, err
+			return nil, nil, nil, false,
+				pgerror.Newf(pgcode.InvalidParameterValue, unsupportedCompErrFmt, sig)
 
 		}
 		fnsStr := formatCandidates(op.String(), s.overloads, s.overloadIdxs)
