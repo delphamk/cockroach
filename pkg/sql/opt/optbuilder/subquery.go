@@ -110,8 +110,10 @@ func (sub *subquery) TypeCheck( // here
 			// stack := debug.Stack()
 			// fmt.Printf(">>> stack: %s\n", stack)
 			// called in replaceAggregate
-			// panic(sqlerrors.NewAggInAggError())
-			return nil, sqlerrors.NewAggInAggError()
+			if false{
+				panic(sqlerrors.NewAggInAggError())
+			}
+			return nil, pgerror.New(pgcode.Grouping, "[sub]aggregate function calls cannot be nested2")
 		}
 		return sub, nil
 	}
