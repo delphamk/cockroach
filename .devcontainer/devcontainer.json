@@ -1,0 +1,17 @@
+{
+	"name": "crdb dev container",
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/common-utils:2": {},
+		"ghcr.io/devcontainers-community/features/bazel:1": {},
+		"ghcr.io/devcontainers/features/go:1": {},
+		"ghcr.io/devcontainers/features/nix:1": {}
+	},
+	"containerEnv": {
+		"SHELL": "/bin/zsh"
+	},
+	"postCreateCommand": "/home/vscode/dots/install-home-manager && /home/vscode/dots/setup",
+	"mounts": [
+		"source=${localEnv:HOME}/dots,target=/home/vscode/dots,type=bind,consistency=cached"
+	]
+}
