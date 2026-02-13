@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/cockroachdb/cockroach/pkg/sql/lex"
 	"github.com/cockroachdb/cockroach/pkg/sql/oidext"
@@ -1632,6 +1633,8 @@ type AnnotateTypeExpr struct {
 	Type ResolvableTypeReference
 
 	SyntaxMode annotateSyntaxMode
+
+	typeAnnotation
 }
 
 // Format implements the NodeFormatter interface.
@@ -1809,11 +1812,14 @@ func (node *Subquery) String() string         { return AsString(node) }
 func (node *RoutineExpr) String() string      { return AsString(node) }
 func (node *Tuple) String() string            { return AsString(node) }
 func (node *TupleStar) String() string        { return AsString(node) }
-func (node *AnnotateTypeExpr) String() string { return AsString(node) }
-func (node *UnaryExpr) String() string        { return AsString(node) }
-func (node DefaultVal) String() string        { return AsString(node) }
-func (node PartitionMaxVal) String() string   { return AsString(node) }
-func (node PartitionMinVal) String() string   { return AsString(node) }
-func (node *Placeholder) String() string      { return AsString(node) }
-func (node dNull) String() string             { return AsString(node) }
-func (list *NameList) String() string         { return AsString(list) }
+func (node *AnnotateTypeExpr) String() string {
+	// fmt.Printf(">>> AnnotateTypeExpr.String() %q\n", node.Expr)
+	return AsString(node)
+}
+func (node *UnaryExpr) String() string      { return AsString(node) }
+func (node DefaultVal) String() string      { return AsString(node) }
+func (node PartitionMaxVal) String() string { return AsString(node) }
+func (node PartitionMinVal) String() string { return AsString(node) }
+func (node *Placeholder) String() string    { return AsString(node) }
+func (node dNull) String() string           { return AsString(node) }
+func (list *NameList) String() string       { return AsString(list) }
