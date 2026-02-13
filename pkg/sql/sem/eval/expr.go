@@ -182,6 +182,7 @@ func (e *evaluator) EvalCastExpr(ctx context.Context, expr *tree.CastExpr) (tree
 
 	// NULL cast to anything is NULL.
 	if d == tree.DNull {
+		// fmt.Printf(">>> CAST NULL expr=%q\n", expr)
 		return d, nil
 	}
 	d = UnwrapDatum(ctx, e.ctx(), d)

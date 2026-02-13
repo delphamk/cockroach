@@ -713,6 +713,15 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 	s.inAgg = false
 
 	for curr := s; curr != nil; curr = curr.parent {
+
+		if curr.groupby != nil {
+			for i := range curr.groupby.aggregateResultCols() {
+				if cols.Contains(curr.groupby.aggregateResultCols()[i].id) {
+					panic(sqlerrors.NewAggInAggError())
+				}
+			}
+		}
+
 		if cols.Len() == 0 || cols.Intersects(curr.colSet()) {
 			curr.verifyAggregateContext()
 			if curr.groupby == nil {
@@ -722,7 +731,7 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 		}
 	}
 
-	panic(errors.AssertionFailedf("aggregate function is not allowed in this context"))
+	panic(pgerror.New(pgcode.Grouping, "aggregate function WRONG ERROR"))
 }
 
 // verifyAggregateContext checks that the current scope is allowed to contain
@@ -1014,6 +1023,7 @@ func makeUntypedTuple(labels []string, texprs []tree.TypedExpr) *tree.Tuple {
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
+
 	switch t := expr.(type) {
 	case *tree.AllColumnsSelector, *tree.TupleStar:
 		// AllColumnsSelectors and TupleStars at the top level of a SELECT clause
@@ -1089,6 +1099,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 	case *tree.FuncExpr:
 		semaCtx := s.builder.semaCtx
+
 		// TODO(mgartner): At this point the the function has not been type checked
 		// and resolved to one overload yet. Consider refactoring this so that it
 		// can handle overloads with the same name.
@@ -1103,22 +1114,90 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
-		if isGenerator(def) && s.replaceSRFs {
-			expr = s.replaceSRF(t, def)
+		test1 := func() { // here
+			if true {
+				// return
+			}
+
+			defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+
+			t, def = s.replaceCount(t, def)
+
+			expr = t.Walk(s)
+
+			t = expr.(*tree.FuncExpr)
+
+			fCopy := *t
+			if orderedSetDef, found := isOrderedSetAggregate(def); found {
+				if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
+					panic(pgerror.Newf(
+						pgcode.InvalidFunctionDefinition,
+						"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
+				}
+				def = orderedSetDef
+				fCopy.Func.FunctionReference = orderedSetDef
+				oldExprs := t.Exprs
+				fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+				copy(fCopy.Exprs, oldExprs)
+				fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
+				t = &fCopy
+			}
+			typedFuncX, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
+			if err != nil {
+				panic(err)
+			}
+			var ok bool
+			t, ok = typedFuncX.(*tree.FuncExpr)
+			if !ok {
+				panic("not a FuncExpr")
+			}
+			expr = t
+		}
+
+		if isGenerator(def) {
+
+			test1()
+
+			if s.replaceSRFs {
+				expr = s.replaceSRF(t, def)
+			} else {
+
+				if err := semaCtx.CheckFunctionClass(def.Name, tree.GeneratorClass); err != nil {
+					panic(err)
+				}
+
+				defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+
+				s.builder.semaCtx.Properties.Require(s.context.String(),
+					tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
+				semaCtx.Properties.Ancestors.Push(tree.FuncExprAncestor)
+
+				s.builder.semaCtx.Properties.Derived.SeenGenerator = true
+
+				expr = expr.Walk(s)
+			}
+
 			break
 		}
 
+		if isGenerator(def) {
+			fmt.Printf(">>> generator: replaceSRFs=%v expr%q \n", s.replaceSRFs, expr)
+		}
+
 		if isAggregate(def) && t.WindowDef == nil {
+			test1()
 			expr = s.replaceAggregate(t, def)
 			break
 		}
 
 		if t.WindowDef != nil {
+			test1()
 			expr = s.replaceWindowFn(t, def)
 			break
 		}
 
 		if isSQLFn(def) {
+			test1()
 			expr = s.replaceSQLFn(t, def)
 			break
 		}
@@ -1183,8 +1262,11 @@ func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinitio
 
 	s.builder.semaCtx.Properties.Require(s.context.String(),
 		tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
+	s.builder.semaCtx.Properties.Derived.SeenGenerator = true
 
-	expr := f.Walk(s)
+	// expr := f.Walk(s)
+	expr := f
+
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)
@@ -1255,47 +1337,20 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
 
-	// We need to save and restore the previous value of the field in
-	// semaCtx in case we are recursively called within a subquery
-	// context.
 	defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 	s.builder.semaCtx.Properties.Require("aggregate",
 		tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
 
-	// Make a copy of f so we can modify it if needed.
-	fCopy := *f
-	// Override ordered-set aggregates to use their impl counterparts.
-	if orderedSetDef, found := isOrderedSetAggregate(def); found {
-		// Ensure that the aggregation is well formed.
-		if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
-			panic(pgerror.Newf(
-				pgcode.InvalidFunctionDefinition,
-				"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
-		}
-
-		// Override function definition.
-		def = orderedSetDef
-		fCopy.Func.FunctionReference = orderedSetDef
-
-		// Copy Exprs slice.
-		oldExprs := f.Exprs
-		fCopy.Exprs = make(tree.Exprs, len(oldExprs))
-		copy(fCopy.Exprs, oldExprs)
-
-		// Add implicit column to the input expressions.
-		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
-	}
-
-	expr := fCopy.Walk(s)
-
 	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
 	// building aggregate function arguments below in buildAggregateFunction.
+	// s.inAgg = false
 	tempScope := s.startAggFunc()
+
+	expr := f
 
 	// We need to do this check here to ensure that we check the usage of special
 	// functions with the right error message.
@@ -1305,7 +1360,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 			defer func() { s.builder.semaCtx.Properties.Restore(oldProps) }()
 
 			s.builder.semaCtx.Properties.Require("FILTER", tree.RejectSpecial)
-			_, err := tree.TypeCheck(s.builder.ctx, expr.(*tree.FuncExpr).Filter, s.builder.semaCtx, types.AnyElement)
+			_, err := tree.TypeCheck(s.builder.ctx, f.Filter, s.builder.semaCtx, types.AnyElement)
 			if err != nil {
 				panic(err)
 			}
@@ -1363,7 +1418,6 @@ func (s *scope) constructWindowDef(def tree.WindowDef) tree.WindowDef {
 }
 
 func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
 
 	if err := tree.CheckIsWindowOrAgg(def); err != nil {
 		panic(err)
@@ -1378,11 +1432,13 @@ func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefi
 		tree.RejectNestedWindowFunctions)
 
 	// Make a copy of f so we can modify the WindowDef.
-	fCopy := *f
+	// fCopy := *f
+	// newWindowDef := s.constructWindowDef(*f.WindowDef)
+	// fCopy.WindowDef = &newWindowDef
 	newWindowDef := s.constructWindowDef(*f.WindowDef)
-	fCopy.WindowDef = &newWindowDef
 
-	expr := fCopy.Walk(s)
+	f.WindowDef = &newWindowDef
+	expr := f
 
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
@@ -1467,7 +1523,7 @@ func (s *scope) replaceSQLFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinit
 
 	s.builder.semaCtx.Properties.Require("SQL function", tree.RejectSpecial)
 
-	expr := f.Walk(s)
+	expr := f
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)

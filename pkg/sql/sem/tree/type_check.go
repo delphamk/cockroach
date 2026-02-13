@@ -1128,7 +1128,68 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 				return NewAggInAggError()
 			}
 			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context) // here
+			}
+			sc.Properties.Derived.SeenAggregate = true
+		}
+	}
+	if fnCls == GeneratorClass {
+
+		if sc.Properties.IsSet(RejectGenerators) {
+			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context)
+		}
+		if sc.Properties.Ancestors.Has(ConditionalAncestor) {
+			return NewInvalidFunctionUsageError(GeneratorClass, "conditional expressions")
+		}
+		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
+			sc.Properties.IsSet(RejectNestedGenerators) {
+			return NewInvalidNestedSRFError(sc.Properties.required.context)
+		}
+		sc.Properties.Derived.SeenGenerator = true
+	}
+	return nil
+}
+
+// checkFunctionUsage checks whether a given built-in function is
+// allowed in the current context.
+func (sc *SemaContext) CheckFunctionClass(name string, fnCls FunctionClass) error {
+	err := sc.checkFunctionClass(fnCls)
+	if err != nil {
+
+		err = pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+			"%s()", name) // def.name
+
+	}
+	return err
+}
+
+func (sc *SemaContext) checkFunctionClass(fnCls FunctionClass) error {
+	if sc == nil {
+		// We can't check anything further. Give up.
+		return nil
+	}
+
+	if fnCls == WindowClass {
+		if sc.Properties.IsSet(RejectWindowApplications) {
+			return NewInvalidFunctionUsageError(WindowClass, sc.Properties.required.context)
+		}
+
+		if sc.Properties.Ancestors.Has(WindowFuncAncestor) &&
+			sc.Properties.IsSet(RejectNestedWindowFunctions) {
+			return pgerror.Newf(pgcode.Windowing, "window function calls cannot be nested")
+		}
+		sc.Properties.Derived.SeenWindowApplication = true
+	} else {
+		// If it is an aggregate function *not used OVER a window*, then
+		// we have an aggregation.
+		if fnCls == AggregateClass {
+			if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
+				sc.Properties.IsSet(RejectNestedAggregates) {
+				return NewAggInAggError()
+			}
+			if sc.Properties.IsSet(RejectAggregates) {
+
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context) // here
 			}
 			sc.Properties.Derived.SeenAggregate = true
 		}
@@ -1256,10 +1317,10 @@ func (expr *FuncExpr) TypeCheck(
 		return nil, err
 	}
 
-	if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
-		return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
-			"%s()", def.Name)
-	}
+	// if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+	// 		"%s()", def.Name)
+	// }
 
 	typeNames := func(typedExprs []TypedExpr) string {
 		var sb strings.Builder
@@ -1543,6 +1604,12 @@ func (expr *FuncExpr) TypeCheck(
 	if overloadImpl.OnTypeCheck != nil {
 		overloadImpl.OnTypeCheck()
 	}
+
+	// if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+	// 		"%s()", def.Name)
+	// }
+
 	return expr, nil
 }
 

@@ -42,6 +42,7 @@ func (s *srf) Walk(v tree.Visitor) tree.Expr {
 func (s *srf) TypeCheck(
 	_ context.Context, ctx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+
 	if ctx.Properties.IsSet(tree.RejectGenerators) {
 		// srf replacement can happen before type-checking, so we need to check
 		// invalid usage here.

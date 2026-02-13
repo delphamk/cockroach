@@ -224,6 +224,10 @@ func (a *aggregateInfo) TypeCheck(
 	if _, err := a.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}
+	err := semaCtx.CheckFunctionClass(a.def.Name, tree.AggregateClass)
+	if err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
