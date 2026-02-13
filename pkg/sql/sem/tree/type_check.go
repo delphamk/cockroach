@@ -1130,22 +1130,21 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 				return NewAggInAggError()
 			}
 			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context) // here
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
 			}
 			sc.Properties.Derived.SeenAggregate = true
 		}
 	}
 	if fnCls == GeneratorClass {
-
+		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
+			sc.Properties.IsSet(RejectNestedGenerators) {
+			return NewInvalidNestedSRFError(sc.Properties.required.context)
+		}
 		if sc.Properties.IsSet(RejectGenerators) {
 			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context)
 		}
 		if sc.Properties.Ancestors.Has(ConditionalAncestor) {
 			return NewInvalidFunctionUsageError(GeneratorClass, "conditional expressions")
-		}
-		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
-			sc.Properties.IsSet(RejectNestedGenerators) {
-			return NewInvalidNestedSRFError(sc.Properties.required.context)
 		}
 		sc.Properties.Derived.SeenGenerator = true
 	}
@@ -1607,10 +1606,10 @@ func (expr *FuncExpr) TypeCheck(
 		overloadImpl.OnTypeCheck()
 	}
 
-	// if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
-	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
-	// 		"%s()", def.Name)
-	// }
+	if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+		return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+			"%s()", def.Name)
+	}
 
 	return expr, nil
 }

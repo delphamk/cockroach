@@ -1180,10 +1180,6 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			break
 		}
 
-		if isGenerator(def) {
-			fmt.Printf(">>> generator: replaceSRFs=%v expr%q \n", s.replaceSRFs, expr)
-		}
-
 		if isAggregate(def) && t.WindowDef == nil {
 			test1()
 			expr = s.replaceAggregate(t, def)
