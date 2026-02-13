@@ -810,13 +810,15 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	switch {
 	case isConstant(expr.Expr):
 		c := expr.Expr.(Constant)
+		// fmt.Printf(">>> isConstant \n",)
 		if canConstantBecome(c, annotateType) {
+		// fmt.Printf(">>> canConstantBecome \n",)
 			forceElideCast=true
 		}
-	case semaCtx.isUnresolvedPlaceholder(expr.Expr):
-		fmt.Printf(">>> canConstantBecome \n",)
-	case isArrayExpr(expr.Expr):
-		fmt.Printf(">>> isArrayExpr \n",)
+	// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+	// 	fmt.Printf(">>> isUnresolvedPlaceholder \n",)
+	// case isArrayExpr(expr.Expr):
+	// 	fmt.Printf(">>> isArrayExpr \n",)
 	}
 
 	subExpr, err := typeCheckAndRequire(
