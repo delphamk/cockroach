@@ -800,6 +800,25 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 	expr.Type = annotateType
+
+	_, isPlaceholder := expr.Expr.(*Placeholder)
+	canElideCast := !isPlaceholder
+
+	forceElideCast := false
+
+
+	switch {
+	case isConstant(expr.Expr):
+		c := expr.Expr.(Constant)
+		if canConstantBecome(c, annotateType) {
+			forceElideCast=true
+		}
+	case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+		fmt.Printf(">>> canConstantBecome \n",)
+	case isArrayExpr(expr.Expr):
+		fmt.Printf(">>> isArrayExpr \n",)
+	}
+
 	subExpr, err := typeCheckAndRequire(
 		ctx,
 		semaCtx,
@@ -814,7 +833,17 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	if err != nil {
 		return nil, err
 	}
-	return subExpr, nil
+
+	// Elide the cast if it is a no-op.
+	if forceElideCast || (canElideCast && subExpr.ResolvedType().Identical(annotateType) ){
+		return subExpr, nil
+	}
+
+	// return subExpr, nil
+	expr.Expr = subExpr
+	expr.typ = annotateType
+
+	return expr, nil
 }
 
 // TypeCheck implements the Expr interface.
