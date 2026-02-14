@@ -837,7 +837,12 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 
 	replaceSub := forceElideCast || (canElideCast && subExpr.ResolvedType().Identical(annotateType))
 
-	replaceSub = true
+	fmt.Printf(">>> anno replaceSub %v \n", replaceSub)
+	fmt.Printf(">>> anno subExpr %v %T \n", subExpr, subExpr)
+	fmt.Printf(">>> anno subExpr.ResolvedType() %v %T \n", subExpr.ResolvedType(), subExpr.ResolvedType())
+	fmt.Printf(">>> anno annotateType %v %T\n", annotateType, annotateType)
+
+	// replaceSub = true
 	// Elide the cast if it is a no-op.
 	if replaceSub {
 		return subExpr, nil
