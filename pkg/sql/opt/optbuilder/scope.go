@@ -1142,6 +1142,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 				fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
 				t = &fCopy
 			}
+			s.builder.semaCtx.Properties.Require("TEST1 CONTEXT", 0)
 			typedFuncX, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
 			if err != nil {
 				panic(err)
@@ -1158,7 +1159,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 			test1()
 
-				expr = s.replaceSRF(t, def)
+			expr = s.replaceSRF(t, def)
 
 			break
 		}
@@ -1182,9 +1183,9 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isGenerator(def) && s.replaceSRFs == false {
-			
+			break
+
 			// test1()
-			
 
 			// if err := semaCtx.CheckFunctionClass(def.Name, tree.GeneratorClass); err != nil {
 			// 	panic(err)

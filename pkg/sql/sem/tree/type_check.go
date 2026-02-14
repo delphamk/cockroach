@@ -806,19 +806,18 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 
 	forceElideCast := false
 
-
 	switch {
 	case isConstant(expr.Expr):
 		c := expr.Expr.(Constant)
 		// fmt.Printf(">>> isConstant \n",)
 		if canConstantBecome(c, annotateType) {
-		// fmt.Printf(">>> canConstantBecome \n",)
-			forceElideCast=true
+			// fmt.Printf(">>> canConstantBecome \n",)
+			forceElideCast = true
 		}
-	// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
-	// 	fmt.Printf(">>> isUnresolvedPlaceholder \n",)
-	// case isArrayExpr(expr.Expr):
-	// 	fmt.Printf(">>> isArrayExpr \n",)
+		// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+		// 	fmt.Printf(">>> isUnresolvedPlaceholder \n",)
+		// case isArrayExpr(expr.Expr):
+		// 	fmt.Printf(">>> isArrayExpr \n",)
 	}
 
 	subExpr, err := typeCheckAndRequire(
@@ -836,8 +835,11 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 
+	replaceSub := forceElideCast || (canElideCast && subExpr.ResolvedType().Identical(annotateType))
+
+	replaceSub = true
 	// Elide the cast if it is a no-op.
-	if forceElideCast || (canElideCast && subExpr.ResolvedType().Identical(annotateType) ){
+	if replaceSub {
 		return subExpr, nil
 	}
 
@@ -1322,6 +1324,17 @@ func (expr *FuncExpr) TypeCheck(
 	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
 	// 		"%s()", def.Name)
 	// }
+
+	// func() {
+	// 	funcCls, err := def.GetClass()
+	// 	if err != nil {
+	// 		fmt.Printf(">>> ERROR %v\n", err)
+	// 		return
+	// 	}
+	// 	fmt.Printf(">>> expr %q \n", expr)
+	// 	fmt.Printf(">>> name %q \n", def.Name)
+	// 	fmt.Printf(">>> funcClas %q \n", funcCls)
+	// }()
 
 	typeNames := func(typedExprs []TypedExpr) string {
 		var sb strings.Builder
