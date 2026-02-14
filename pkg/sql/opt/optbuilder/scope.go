@@ -1154,28 +1154,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			expr = t
 		}
 
-		if isGenerator(def) {
+		if isGenerator(def) && s.replaceSRFs {
 
 			test1()
 
-			if s.replaceSRFs {
 				expr = s.replaceSRF(t, def)
-			} else {
-
-				if err := semaCtx.CheckFunctionClass(def.Name, tree.GeneratorClass); err != nil {
-					panic(err)
-				}
-
-				defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
-
-				s.builder.semaCtx.Properties.Require(s.context.String(),
-					tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
-				semaCtx.Properties.Ancestors.Push(tree.FuncExprAncestor)
-
-				s.builder.semaCtx.Properties.Derived.SeenGenerator = true
-
-				expr = expr.Walk(s)
-			}
 
 			break
 		}
@@ -1196,6 +1179,26 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			test1()
 			expr = s.replaceSQLFn(t, def)
 			break
+		}
+
+		if isGenerator(def) && s.replaceSRFs == false {
+			
+			// test1()
+			
+
+			// if err := semaCtx.CheckFunctionClass(def.Name, tree.GeneratorClass); err != nil {
+			// 	panic(err)
+			// }
+
+			// defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+
+			// s.builder.semaCtx.Properties.Require(s.context.String(),
+			// 	tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
+			// semaCtx.Properties.Ancestors.Push(tree.FuncExprAncestor)
+
+			// s.builder.semaCtx.Properties.Derived.SeenGenerator = true
+
+			// expr = expr.Walk(s)
 		}
 
 	case *tree.ArrayFlatten:
