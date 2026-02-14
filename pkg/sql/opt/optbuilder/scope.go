@@ -1428,13 +1428,11 @@ func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefi
 		tree.RejectNestedWindowFunctions)
 
 	// Make a copy of f so we can modify the WindowDef.
-	// fCopy := *f
-	// newWindowDef := s.constructWindowDef(*f.WindowDef)
-	// fCopy.WindowDef = &newWindowDef
+	fCopy := *f
 	newWindowDef := s.constructWindowDef(*f.WindowDef)
+	fCopy.WindowDef = &newWindowDef
 
-	f.WindowDef = &newWindowDef
-	expr := f
+	expr := fCopy.Walk(s)
 
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
