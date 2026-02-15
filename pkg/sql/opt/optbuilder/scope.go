@@ -1352,6 +1352,11 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 
 	expr := f
 
+	desired := types.AnyElement
+	// desired = expr.ResolvedType()
+
+	// fmt.Printf(">>> replaceAgg desired=%q \n", desired)
+
 	// We need to do this check here to ensure that we check the usage of special
 	// functions with the right error message.
 	if f.Filter != nil {
@@ -1360,20 +1365,22 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 			defer func() { s.builder.semaCtx.Properties.Restore(oldProps) }()
 
 			s.builder.semaCtx.Properties.Require("FILTER", tree.RejectSpecial)
-			_, err := tree.TypeCheck(s.builder.ctx, f.Filter, s.builder.semaCtx, types.AnyElement)
+			_, err := tree.TypeCheck(s.builder.ctx, f.Filter, s.builder.semaCtx, desired)
 			if err != nil {
 				panic(err)
 			}
 		}()
 	}
 
-	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
+	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, desired)
 	if err != nil {
 		panic(err)
 	}
 	if typedFunc == tree.DNull {
+		fmt.Printf(">>> replaceAgg typedFunc is NULL!\n")
 		return tree.DNull
 	}
+	// fmt.Printf(">>> replaceAgg typedFunc.ResolvedType()=%q \n", typedFunc.ResolvedType())
 
 	f = typedFunc.(*tree.FuncExpr)
 

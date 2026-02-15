@@ -475,6 +475,13 @@ func (expr *BinaryExpr) TypeCheck(
 func (expr *CaseExpr) TypeCheck(
 	ctx context.Context, semaCtx *SemaContext, desired *types.T,
 ) (TypedExpr, error) {
+	// fmt.Printf(">>> CaseExpr.TypeCheck desired=%q expr.Expr?=%v \texpr=%q\n", desired, expr.Expr != nil, expr)
+	// fmt.Printf(">>> CASE EXPR TYPE = %q \n", expr.typ)
+
+	if expr.typ != nil {
+		return expr, nil
+	}
+
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)
 		semaCtx.Properties.Ancestors.Push(ConditionalAncestor)
@@ -842,7 +849,7 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	fmt.Printf(">>> anno subExpr.ResolvedType() %v %T \n", subExpr.ResolvedType(), subExpr.ResolvedType())
 	fmt.Printf(">>> anno annotateType %v %T\n", annotateType, annotateType)
 
-	// replaceSub = true
+	replaceSub = true
 	// Elide the cast if it is a no-op.
 	if replaceSub {
 		return subExpr, nil
