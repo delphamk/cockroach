@@ -14,7 +14,7 @@ INSERT INTO holding_history (hh_after_qty)
 ----
 insert holding_history
  ├── columns: <none>
- ├── insert-mapping:
+ ├── insert-mapping1:
  │    ├── unnest:5 => hh_after_qty:1
  │    └── rowid_default:6 => rowid:2
  ├── cardinality: [0 - 0]
