@@ -1268,10 +1268,12 @@ func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinitio
 
 	s.builder.semaCtx.Properties.Require(s.context.String(),
 		tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
+
+	// logic added !
 	s.builder.semaCtx.Properties.Derived.SeenGenerator = true
 
-	// expr := f.Walk(s)
-	expr := f
+	expr := f.Walk(s)
+	// expr := f
 
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
@@ -1356,7 +1358,8 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 	// s.inAgg = false
 	tempScope := s.startAggFunc()
 
-	expr := f
+	// expr := f
+	expr := f.Walk(s)
 
 	desired := types.AnyElement
 	// desired = expr.ResolvedType()
@@ -1534,7 +1537,8 @@ func (s *scope) replaceSQLFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinit
 
 	s.builder.semaCtx.Properties.Require("SQL function", tree.RejectSpecial)
 
-	expr := f
+	// expr := f
+	expr := f.Walk(s)
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
 	if err != nil {
 		panic(err)

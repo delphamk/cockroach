@@ -34,6 +34,49 @@ insert holding_history
 
 
 
+# # same with / without the change
+# opt
+#  SELECT
+#   unnest(ARRAY[20, 30, 40]:::INT4[])
+# ----
+# values
+#  ├── columns: unnest:1!null
+#  ├── cardinality: [3 - 3]
+#  ├── (20,)
+#  ├── (30,)
+#  └── (40,)
+
+
+
+# opt
+# SELECT 
+# (( 
+# SELECT
+#   unnest(ARRAY[20, 30, 40]:::INT4[])
+#   ))
+# ----
+# values
+#  ├── columns: unnest:2
+#  ├── cardinality: [1 - 1]
+#  ├── key: ()
+#  ├── fd: ()-->(2)
+#  └── tuple
+#       └── subquery
+#            └── max1-row
+#                 ├── columns: unnest:1!null
+#                 ├── error: "more than one row returned by a subquery used as an expression"
+#                 ├── cardinality: [1 - 1]
+#                 ├── key: ()
+#                 ├── fd: ()-->(1)
+#                 └── values
+#                      ├── columns: unnest:1!null
+#                      ├── cardinality: [3 - 3]
+#                      ├── (20,)
+#                      ├── (30,)
+#                      └── (40,)
+
+
+
 # opt
 # INSERT INTO holding_history (hh_after_qty)
 # (
