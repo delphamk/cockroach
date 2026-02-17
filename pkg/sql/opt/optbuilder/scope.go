@@ -1114,7 +1114,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
-		test1 := func() { // here
+		test1 := func() bool { // here
 			if true {
 				// return
 			}
@@ -1143,41 +1143,47 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 				t = &fCopy
 			}
 			s.builder.semaCtx.Properties.Require("TEST1 CONTEXT", 0)
-			typedFuncX, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
+			expr, err = tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
 			if err != nil {
 				panic(err)
 			}
 			var ok bool
-			t, ok = typedFuncX.(*tree.FuncExpr)
-			if !ok {
-				panic("not a FuncExpr")
-			}
-			expr = t
+			t, ok = expr.(*tree.FuncExpr)
+			return ok
 		}
 
 		if isGenerator(def) && s.replaceSRFs {
-
-			test1()
-
+			ok := test1()
+			if !ok {
+				break
+			}
 			expr = s.replaceSRF(t, def)
-
 			break
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
-			test1()
+			ok := test1()
+			if !ok {
+				break
+			}
 			expr = s.replaceAggregate(t, def)
 			break
 		}
 
 		if t.WindowDef != nil {
-			test1()
+			ok := test1()
+			if !ok {
+				break
+			}
 			expr = s.replaceWindowFn(t, def)
 			break
 		}
 
 		if isSQLFn(def) {
-			test1()
+			ok := test1()
+			if !ok {
+				break
+			}
 			expr = s.replaceSQLFn(t, def)
 			break
 		}
@@ -1377,7 +1383,7 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		panic(err)
 	}
 	if typedFunc == tree.DNull {
-		fmt.Printf(">>> replaceAgg typedFunc is NULL!\n")
+		// fmt.Printf(">>> replaceAgg typedFunc is NULL!\n")
 		return tree.DNull
 	}
 	// fmt.Printf(">>> replaceAgg typedFunc.ResolvedType()=%q \n", typedFunc.ResolvedType())
