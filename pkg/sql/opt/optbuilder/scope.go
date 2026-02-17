@@ -1023,6 +1023,7 @@ func makeUntypedTuple(labels []string, texprs []tree.TypedExpr) *tree.Tuple {
 // NB: This code is adapted from sql/select_name_resolution.go and
 // sql/subquery.go.
 func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
+	// fmt.Printf("\t------------------ scope.VisitPre T=%T \t\texpr=%q \n", expr, expr)
 
 	switch t := expr.(type) {
 	case *tree.AllColumnsSelector, *tree.TupleStar:
@@ -1098,6 +1099,9 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 	case *tree.FuncExpr:
+		// fmt.Printf(">>> scope \tFuncExpr=%q \n", expr)
+		// defer fmt.Printf(">>> DONE scope FuncExpr=%q \n", expr)
+
 		semaCtx := s.builder.semaCtx
 
 		// TODO(mgartner): At this point the the function has not been type checked
@@ -1115,15 +1119,21 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		test1 := func() bool { // here
+
 			if true {
-				// return
+				// return true
 			}
+
+			// fmt.Printf(">>>\t START test1 \n")
+			// defer fmt.Printf(">>>\t DONE test1 \n")
 
 			defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 			t, def = s.replaceCount(t, def)
 
+			// fmt.Printf(">>> BEFORE test1 walk \n")
 			expr = t.Walk(s)
+			// fmt.Printf(">>> AFTER test1 walk \n")
 
 			t = expr.(*tree.FuncExpr)
 
@@ -1149,10 +1159,19 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			}
 			var ok bool
 			t, ok = expr.(*tree.FuncExpr)
+			if !ok {
+				for i := 0; i < 5; i++ {
+					fmt.Printf(">>> NOT FuncExpr!! \n")
+				}
+			}
+			// fmt.Printf(">>> test1 ResolvedType=%q \n", t.ResolvedType())
+
 			return ok
 		}
 
 		if isGenerator(def) && s.replaceSRFs {
+			// fmt.Printf(">>> gen name=%q\n", def.Name)
+
 			ok := test1()
 			if !ok {
 				break
@@ -1162,6 +1181,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isAggregate(def) && t.WindowDef == nil {
+			// fmt.Printf(">>> agg \n")
+
 			ok := test1()
 			if !ok {
 				break
@@ -1171,6 +1192,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if t.WindowDef != nil {
+			// fmt.Printf(">>> window \n")
+
 			ok := test1()
 			if !ok {
 				break
@@ -1180,6 +1203,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isSQLFn(def) {
+			// fmt.Printf(">>> sql \n")
+
 			ok := test1()
 			if !ok {
 				break
@@ -1189,6 +1214,8 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if isGenerator(def) && s.replaceSRFs == false {
+			// fmt.Printf(">>> no replaceSRFs \n")
+
 			break
 
 			// test1()
@@ -1279,6 +1306,8 @@ func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinitio
 	if err != nil {
 		panic(err)
 	}
+
+	// fmt.Printf(">>> replaceSRF ResolvedType=%q \n", typedFunc.ResolvedType())
 
 	srfScope := s.push()
 	var outCol *scopeColumn

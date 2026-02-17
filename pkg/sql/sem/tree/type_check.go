@@ -849,7 +849,7 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	// fmt.Printf(">>> anno subExpr.ResolvedType() %v %T \n", subExpr.ResolvedType(), subExpr.ResolvedType())
 	// fmt.Printf(">>> anno annotateType %v %T\n", annotateType, annotateType)
 
-	replaceSub = true
+	replaceSub = false
 	// Elide the cast if it is a no-op.
 	if replaceSub {
 		return subExpr, nil
