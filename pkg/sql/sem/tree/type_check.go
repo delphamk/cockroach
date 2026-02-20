@@ -566,7 +566,7 @@ func resolveCast(context string, castFrom, castTo *types.T, allowStable bool) er
 		// the same, and if there are casts resolvable across all of the elements
 		// pointwise. Casts to AnyTuple are always allowed since they are
 		// implemented as a no-op.
-		if castTo.Identical(types.AnyTuple) {
+		if castTo.Identical(types.AnyTuple) || castFrom.Identical(types.AnyTuple) {
 			return nil
 		}
 		fromTuple := castFrom.TupleContents()
