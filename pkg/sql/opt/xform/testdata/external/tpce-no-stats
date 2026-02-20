@@ -3775,17 +3775,17 @@ insert holding_history
  ├── insert-mapping:
  │    ├── unnest:7 => holding_history.hh_h_t_id:1
  │    ├── "?column?":10 => holding_history.hh_t_id:2
- │    ├── unnest:8 => hh_before_qty:3
- │    └── unnest:9 => hh_after_qty:4
+ │    ├── hh_before_qty_cast:11 => hh_before_qty:3
+ │    └── hh_after_qty_cast:12 => hh_after_qty:4
  ├── input binding: &1
  ├── cardinality: [0 - 0]
  ├── volatile, mutations
  ├── project
- │    ├── columns: "?column?":10!null unnest:7!null unnest:8!null unnest:9!null
+ │    ├── columns: "?column?":10!null unnest:7!null hh_before_qty_cast:11!null hh_after_qty_cast:12!null
  │    ├── cardinality: [3 - 3]
  │    ├── fd: ()-->(10)
  │    ├── values
- │    │    ├── columns: unnest:7!null unnest:8!null unnest:9!null
+ │    │    ├── columns: unnest:7!null hh_before_qty_cast:11!null hh_after_qty_cast:12!null
  │    │    ├── cardinality: [3 - 3]
  │    │    ├── (1, 10, 20)
  │    │    ├── (2, 20, 30)
@@ -3795,29 +3795,29 @@ insert holding_history
  └── f-k-checks
       ├── f-k-checks-item: holding_history(hh_h_t_id) -> trade(t_id)
       │    └── anti-join (lookup trade)
-      │         ├── columns: hh_h_t_id:11!null
-      │         ├── key columns: [11] = [12]
+      │         ├── columns: hh_h_t_id:13!null
+      │         ├── key columns: [13] = [14]
       │         ├── lookup columns are key
       │         ├── cardinality: [0 - 3]
       │         ├── with-scan &1
-      │         │    ├── columns: hh_h_t_id:11!null
+      │         │    ├── columns: hh_h_t_id:13!null
       │         │    ├── mapping:
-      │         │    │    └──  unnest:7 => hh_h_t_id:11
+      │         │    │    └──  unnest:7 => hh_h_t_id:13
       │         │    └── cardinality: [3 - 3]
       │         └── filters (true)
       └── f-k-checks-item: holding_history(hh_t_id) -> trade(t_id)
            └── anti-join (lookup trade)
-                ├── columns: hh_t_id:29!null
-                ├── key columns: [29] = [30]
+                ├── columns: hh_t_id:31!null
+                ├── key columns: [31] = [32]
                 ├── lookup columns are key
                 ├── cardinality: [0 - 3]
-                ├── fd: ()-->(29)
+                ├── fd: ()-->(31)
                 ├── with-scan &1
-                │    ├── columns: hh_t_id:29!null
+                │    ├── columns: hh_t_id:31!null
                 │    ├── mapping:
-                │    │    └──  "?column?":10 => hh_t_id:29
+                │    │    └──  "?column?":10 => hh_t_id:31
                 │    ├── cardinality: [3 - 3]
-                │    └── fd: ()-->(29)
+                │    └── fd: ()-->(31)
                 └── filters (true)
 
 # Q8
