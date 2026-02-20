@@ -847,9 +847,9 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	// fmt.Printf(">>> anno replaceSub %v \n", replaceSub)
 	// fmt.Printf(">>> anno subExpr %v %T \n", subExpr, subExpr)
 	// fmt.Printf(">>> anno subExpr.ResolvedType() %v %T \n", subExpr.ResolvedType(), subExpr.ResolvedType())
-	// fmt.Printf(">>> anno annotateType %v %T\n", annotateType, annotateType)
+	// fmt.Printf(">>> anno annotateType %v %TW\n", annotateType, annotateType)
 
-	replaceSub = false
+	// replaceSub = false
 	// Elide the cast if it is a no-op.
 	if replaceSub {
 		return subExpr, nil
@@ -3364,8 +3364,15 @@ func typeCheckSameTypedTupleExprs(
 			if err != nil {
 				return nil, nil, err
 			}
+			// Equivalent also includes NULL::RECORD
+			// !IsWildcardType is to disallow NULL::RECORD
+			isEquivalent := typedExpr.ResolvedType().Equivalent(resTypes) && typedExpr.ResolvedType().IsWildcardType() == false
+			if isEquivalent {
+				typedExprs[tupleIdx] = typedExpr
+				continue
+			}
 			isTypedNull := typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */)
-			fmt.Printf(">>> isTypedNull=%v expr=%q resTypes=%q\n", isTypedNull, typedExpr, resTypes)
+			// fmt.Printf(">>> isTypedNull=%v expr=%q resTypes=%q\n", isTypedNull, typedExpr, resTypes)
 			if !isTypedNull {
 				return nil, nil, errors.Wrap(unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType()), "NOT_NULL")
 			}
