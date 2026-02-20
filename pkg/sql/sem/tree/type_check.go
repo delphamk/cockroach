@@ -3227,14 +3227,19 @@ func typeCheckSameTypedTupleExprs(
 			t.typ = resTypes
 			typedExprs[tupleIdx] = t
 		} else {
+			fmt.Printf(">>> pree typecheck %q resTypes=%q\n", expr, resTypes)
+
 			typedExpr, err := expr.TypeCheck(ctx, semaCtx, resTypes)
 			if err != nil {
 				return nil, nil, err
 			}
-			if !typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */) {
-				return nil, nil, unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType())
+			isTypedNull := typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */)
+			fmt.Printf(">>> isTypedNull=%v expr=%q resTypes=%q\n", isTypedNull, typedExpr, resTypes)
+			if !isTypedNull {
+				return nil, nil, errors.Wrap(unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType()), "NOT_NULL")
 			}
-			typedExprs[tupleIdx] = typedExpr
+			typedExprs[tupleIdx] = NewTypedCastExpr(typedExpr, resTypes)
+
 		}
 	}
 	return typedExprs, resTypes, nil
@@ -3249,6 +3254,7 @@ func checkAllExprsAreTuplesOrNulls(ctx context.Context, semaCtx *SemaContext, ex
 		if err != nil {
 			return err
 		}
+		fmt.Printf(">>> isNull=%v isTuple=%v expr=%q \n", isNull, isTuple, expr)
 		if !(isTuple || isNull) {
 			// We avoid calling TypeCheck on Tuple exprs since that causes the
 			// types to be resolved, which we only want to do later in type-checking.

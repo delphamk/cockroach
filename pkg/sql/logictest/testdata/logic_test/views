@@ -80,3 +80,16 @@ select (1.1,4)::RECORD::my_pair5::my_pair2::my_pair5;
 # query T
 # select ('1',2)::RECORD::my_pair;
 # ----
+
+statement ok
+CREATE TYPE my_pair AS (name text, id integer);
+
+statement ok
+SELECT CASE WHEN true THEN ('aaaa', 2)::my_pair ELSE NULL::RECORD END;
+
+
+# statement ok
+# SELECT CASE WHEN true THEN NULL::my_pair ELSE ('aaaa', 2)::my_pair END;
+
+
+# SELECT CASE WHEN true THEN ('a', 2)::my_pair ELSE NULL END;
