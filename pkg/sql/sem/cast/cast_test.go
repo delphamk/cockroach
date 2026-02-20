@@ -214,6 +214,16 @@ func TestTupleCastVolatility(t *testing.T) {
 			to:   []*types.T{types.Int, types.Date},
 			exp:  "stable",
 		},
+		{
+			from: []*types.T{types.AnyElement},
+			to:   []*types.T{types.AnyElement},
+			exp:  "stable",
+		},
+		{
+			from: []*types.T{types.AnyElement},
+			to:   []*types.T{types.Int, types.Int},
+			exp:  "stable",
+		},
 	}
 
 	for _, tc := range testCases {
