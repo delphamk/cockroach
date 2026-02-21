@@ -3392,7 +3392,7 @@ func checkAllExprsAreTuplesOrNulls(ctx context.Context, semaCtx *SemaContext, ex
 		if err != nil {
 			return err
 		}
-		fmt.Printf(">>> isNull=%v isTuple=%v expr=%q \n", isNull, isTuple, expr)
+		// fmt.Printf(">>> isNull=%v isTuple=%v expr=%q \n", isNull, isTuple, expr)
 		if !(isTuple || isNull) {
 			// We avoid calling TypeCheck on Tuple exprs since that causes the
 			// types to be resolved, which we only want to do later in type-checking.
