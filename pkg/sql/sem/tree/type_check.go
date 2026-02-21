@@ -478,9 +478,9 @@ func (expr *CaseExpr) TypeCheck(
 	// fmt.Printf(">>> CaseExpr.TypeCheck desired=%q expr.Expr?=%v \texpr=%q\n", desired, expr.Expr != nil, expr)
 	// fmt.Printf(">>> CASE EXPR TYPE = %q \n", expr.typ)
 
-	if expr.typ != nil {
-		return expr, nil
-	}
+	// if expr.typ != nil {
+	// 	return expr, nil
+	// }
 
 	if semaCtx != nil {
 		defer semaCtx.Properties.Ancestors.PopTo(semaCtx.Properties.Ancestors)
@@ -807,24 +807,22 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 	expr.Type = annotateType
-
-	_, isPlaceholder := expr.Expr.(*Placeholder)
-	canElideCast := !isPlaceholder
-
-	forceElideCast := false
+	isAlreadyConstant := false
+	isUnresolved := false
+	isArray := false
 
 	switch {
 	case isConstant(expr.Expr):
 		c := expr.Expr.(Constant)
-		// fmt.Printf(">>> isConstant \n",)
 		if canConstantBecome(c, annotateType) {
-			// fmt.Printf(">>> canConstantBecome \n",)
-			forceElideCast = true
+			// c := expr.Expr.(Constant)
+			// if canConstantBecome(c, annotateType) {
+			isAlreadyConstant = true
 		}
-		// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
-		// 	fmt.Printf(">>> isUnresolvedPlaceholder \n",)
-		// case isArrayExpr(expr.Expr):
-		// 	fmt.Printf(">>> isArrayExpr \n",)
+	case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+		isUnresolved = true
+	case isArrayExpr(expr.Expr):
+		isArray = true
 	}
 
 	subExpr, err := typeCheckAndRequire(
@@ -842,18 +840,28 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 
-	replaceSub := forceElideCast || (canElideCast && subExpr.ResolvedType().Identical(annotateType))
+	funcExprAncestor := semaCtx == nil || semaCtx.Properties.Ancestors.Has(FuncExprAncestor)
+	alreadyDesired := annotateType.Equal(desired)
 
-	// fmt.Printf(">>> anno replaceSub %v \n", replaceSub)
-	// fmt.Printf(">>> anno subExpr %v %T \n", subExpr, subExpr)
-	// fmt.Printf(">>> anno subExpr.ResolvedType() %v %T \n", subExpr.ResolvedType(), subExpr.ResolvedType())
-	// fmt.Printf(">>> anno annotateType %v %TW\n", annotateType, annotateType)
-
-	// replaceSub = false
-	// Elide the cast if it is a no-op.
-	if replaceSub {
+	if !funcExprAncestor || alreadyDesired || isAlreadyConstant {
 		return subExpr, nil
 	}
+
+	if false {
+		fmt.Printf("\n>>> expr %q \n", expr)
+		fmt.Printf(">>> annotateType %q \n", annotateType)
+		fmt.Printf(">>> desired %q \n", desired)
+		fmt.Printf(">>> ResolvedType %q \n", subExpr.ResolvedType())
+		fmt.Printf(">>> funcExprAncestor %v semaCtx? %v \n", funcExprAncestor, semaCtx == nil)
+		fmt.Printf(">>> alreadyDesired %v  \n", alreadyDesired)
+		fmt.Printf(">>> isConstant %v  \n", isAlreadyConstant)
+		fmt.Printf(">>> isUnresolved %v  \n", isUnresolved)
+		fmt.Printf(">>> isArray %v  \n", isArray)
+	}
+
+	// is contant check greater than already desired check?
+	// already desired is good tbh
+	// just cant explain it yet.
 
 	// return subExpr, nil
 	expr.Expr = subExpr
@@ -3358,7 +3366,6 @@ func typeCheckSameTypedTupleExprs(
 			t.typ = resTypes
 			typedExprs[tupleIdx] = t
 		} else {
-			fmt.Printf(">>> pree typecheck %q resTypes=%q\n", expr, resTypes)
 
 			typedExpr, err := expr.TypeCheck(ctx, semaCtx, resTypes)
 			if err != nil {
