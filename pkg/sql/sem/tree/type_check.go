@@ -3374,7 +3374,7 @@ func typeCheckSameTypedTupleExprs(
 			isTypedNull := typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */)
 			// fmt.Printf(">>> isTypedNull=%v expr=%q resTypes=%q\n", isTypedNull, typedExpr, resTypes)
 			if !isTypedNull {
-				return nil, nil, errors.Wrap(unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType()), "NOT_NULL")
+				return nil, nil, unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType())
 			}
 			typedExprs[tupleIdx] = NewTypedCastExpr(typedExpr, resTypes)
 
