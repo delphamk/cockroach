@@ -360,6 +360,9 @@ func LookupCastVolatility(from, to *types.T) (_ volatility.V, ok bool) {
 		if len(toTypes) == 1 && toTypes[0].Family() == types.AnyFamily {
 			return volatility.Stable, true
 		}
+		if len(fromTypes) == 1 && fromTypes[0].Family() == types.AnyFamily {
+			return volatility.Stable, true
+		}
 		if len(fromTypes) != len(toTypes) {
 			return 0, false
 		}

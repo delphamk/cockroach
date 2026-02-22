@@ -566,7 +566,7 @@ func resolveCast(context string, castFrom, castTo *types.T, allowStable bool) er
 		// the same, and if there are casts resolvable across all of the elements
 		// pointwise. Casts to AnyTuple are always allowed since they are
 		// implemented as a no-op.
-		if castTo.Identical(types.AnyTuple) {
+		if castTo.Identical(types.AnyTuple) || castFrom.Identical(types.AnyTuple) {
 			return nil
 		}
 		fromTuple := castFrom.TupleContents()
@@ -800,6 +800,24 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 	expr.Type = annotateType
+	isAlreadyConstant := false
+	// isUnresolved := false
+	// isArray := false
+
+	switch {
+	case isConstant(expr.Expr):
+		c := expr.Expr.(Constant)
+		if canConstantBecome(c, annotateType) {
+
+			isAlreadyConstant = true
+		}
+		// possible edge cases from?
+		// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+		// 	isUnresolved = true
+		// case isArrayExpr(expr.Expr):
+		// 	isArray = true
+	}
+
 	subExpr, err := typeCheckAndRequire(
 		ctx,
 		semaCtx,
@@ -814,7 +832,18 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	if err != nil {
 		return nil, err
 	}
+
+	funcExprAncestor := semaCtx == nil || semaCtx.Properties.Ancestors.Has(FuncExprAncestor)
+	alreadyDesired := annotateType.Equal(desired)
+
+	if !funcExprAncestor || alreadyDesired || isAlreadyConstant {
 	return subExpr, nil
+	}
+
+	expr.Expr = subExpr
+	expr.typ = annotateType
+
+	return expr, nil
 }
 
 // TypeCheck implements the Expr interface.
@@ -3231,10 +3260,17 @@ func typeCheckSameTypedTupleExprs(
 			if err != nil {
 				return nil, nil, err
 			}
-			if !typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */) {
+			isEquivalent := typedExpr.ResolvedType().Equivalent(resTypes) && typedExpr.ResolvedType().IsWildcardType() == false
+			if isEquivalent {
+				typedExprs[tupleIdx] = typedExpr
+				continue
+			}
+			isTypedNull := typedExpr.ResolvedType().EquivalentOrNull(resTypes, true /* allowNullTupleEquivalence */)
+			if !isTypedNull {
 				return nil, nil, unexpectedTypeError(expr, resTypes, typedExpr.ResolvedType())
 			}
-			typedExprs[tupleIdx] = typedExpr
+			typedExprs[tupleIdx] = NewTypedCastExpr(typedExpr, resTypes)
+
 		}
 	}
 	return typedExprs, resTypes, nil

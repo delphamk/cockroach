@@ -713,6 +713,15 @@ func (s *scope) endAggFunc(cols opt.ColSet) (g *groupby) {
 	s.inAgg = false
 
 	for curr := s; curr != nil; curr = curr.parent {
+
+		if curr.groupby != nil {
+			for i := range curr.groupby.aggregateResultCols() {
+				if cols.Contains(curr.groupby.aggregateResultCols()[i].id) {
+					panic(sqlerrors.NewAggInAggError())
+				}
+			}
+		}
+
 		if cols.Len() == 0 || cols.Intersects(curr.colSet()) {
 			curr.verifyAggregateContext()
 			if curr.groupby == nil {
