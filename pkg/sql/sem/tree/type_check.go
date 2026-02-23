@@ -1313,10 +1313,10 @@ func (expr *FuncExpr) TypeCheck(
 		return nil, err
 	}
 
-	if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
-		return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
-			"%s()", def.Name)
-	}
+	// if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+	// 	return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+	// 		"%s()", def.Name)
+	// }
 
 	typeNames := func(typedExprs []TypedExpr) string {
 		var sb strings.Builder

@@ -1125,7 +1125,6 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 			fCopy := *t
 			if orderedSetDef, found := isOrderedSetAggregate(def); found {
-				fmt.Printf(">>> OrderedSetAggregate %q %q \n", def.Name, expr)
 
 				if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
 					panic(pgerror.Newf(
@@ -1143,8 +1142,6 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 			expr, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
 			if err != nil {
-				fmt.Printf(">>> test TypeCheck err %q \n", err)
-				// panic(errors.Wrap(err, "test1"))
 				panic(err)
 
 			}
@@ -1155,7 +1152,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 
 		class, err := def.GetClass()
 		if err != nil {
-			panic(err)
+			break
 		}
 
 		// if normal or generatore , break
@@ -1167,9 +1164,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 		}
 
 		if !test1() {
-			fmt.Printf(">>> NOT44 FuncExpr %q \n", expr)
-			panic("NOT44 FuncExpr")
-			// break
+			break
 		}
 
 		if isGenerator(def) && s.replaceSRFs {
@@ -1251,6 +1246,7 @@ func (s *scope) replaceSRF(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinitio
 
 	s.builder.semaCtx.Properties.Require(s.context.String(),
 		tree.RejectAggregates|tree.RejectWindowApplications|tree.RejectNestedGenerators)
+	s.builder.semaCtx.Properties.Derived.SeenGenerator = true
 
 	expr := f.Walk(s)
 	typedFunc, err := tree.TypeCheck(s.builder.ctx, expr, s.builder.semaCtx, types.AnyElement)
@@ -1330,8 +1326,8 @@ func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDef
 		tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
 
 	expr := f.Walk(s)
-	
-		// Update this scope to indicate that we are now inside an aggregate function
+
+	// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
 	// building aggregate function arguments below in buildAggregateFunction.

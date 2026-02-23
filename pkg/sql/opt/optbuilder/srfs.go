@@ -50,7 +50,7 @@ func (s *srf) TypeCheck(
 	if ctx.Properties.Ancestors.Has(tree.ConditionalAncestor) {
 		return nil, tree.NewInvalidFunctionUsageError(tree.GeneratorClass, "conditional expressions")
 	}
-	if ctx.Properties.Derived.SeenGenerator {
+	if ctx.Properties.Ancestors.Has(tree.FuncExprAncestor) && ctx.Properties.Derived.SeenGenerator {
 		// This error happens if this srf struct is nested inside a raw srf that
 		// has not yet been replaced. This is possible since scope.replaceSRF first
 		// calls f.Walk(s) on the external raw srf, which replaces any internal
