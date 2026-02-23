@@ -837,7 +837,7 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	alreadyDesired := annotateType.Equal(desired)
 
 	if !funcExprAncestor || alreadyDesired || isAlreadyConstant {
-	return subExpr, nil
+		return subExpr, nil
 	}
 
 	expr.Expr = subExpr
@@ -1149,6 +1149,63 @@ func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionD
 	return nil
 }
 
+// checkFunctionUsage checks whether a given built-in function is
+// allowed in the current context.
+func (sc *SemaContext) CheckFunctionClass(name string, fnCls FunctionClass) error {
+	err := sc.checkFunctionClass(fnCls)
+	if err != nil {
+		return pgerror.Wrapf(err, pgcode.InvalidParameterValue, "%s()", name)
+	}
+	return nil
+}
+
+func (sc *SemaContext) checkFunctionClass(fnCls FunctionClass) error {
+	if sc == nil {
+		// We can't check anything further. Give up.
+		return nil
+	}
+
+	if fnCls == WindowClass {
+		if sc.Properties.IsSet(RejectWindowApplications) {
+			return NewInvalidFunctionUsageError(WindowClass, sc.Properties.required.context)
+		}
+
+		if sc.Properties.Ancestors.Has(WindowFuncAncestor) &&
+			sc.Properties.IsSet(RejectNestedWindowFunctions) {
+			return pgerror.Newf(pgcode.Windowing, "window function calls cannot be nested")
+		}
+		sc.Properties.Derived.SeenWindowApplication = true
+	} else {
+		// If it is an aggregate function *not used OVER a window*, then
+		// we have an aggregation.
+		if fnCls == AggregateClass {
+			if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
+				sc.Properties.IsSet(RejectNestedAggregates) {
+				return NewAggInAggError()
+			}
+			if sc.Properties.IsSet(RejectAggregates) {
+
+				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context) // here
+			}
+			sc.Properties.Derived.SeenAggregate = true
+		}
+	}
+	if fnCls == GeneratorClass {
+		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
+			sc.Properties.IsSet(RejectNestedGenerators) {
+			return NewInvalidNestedSRFError(sc.Properties.required.context)
+		}
+		if sc.Properties.IsSet(RejectGenerators) {
+			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context)
+		}
+		if sc.Properties.Ancestors.Has(ConditionalAncestor) {
+			return NewInvalidFunctionUsageError(GeneratorClass, "conditional expressions")
+		}
+		sc.Properties.Derived.SeenGenerator = true
+	}
+	return nil
+}
+
 // NewContextDependentOpsNotAllowedError creates an error for the case when
 // context-dependent operators are not allowed in the given context.
 func NewContextDependentOpsNotAllowedError(context string) error {
@@ -1324,7 +1381,7 @@ func (expr *FuncExpr) TypeCheck(
 		return nil, err
 	}
 
-	var hasUDFOverload bool
+	var hasUDFOverload, hasAggregate, hasGenerator, hasWindow bool
 	var calledOnNullInputFns, notCalledOnNullInputFns intsets.Fast
 	for _, idx := range s.overloadIdxs {
 		if def.Overloads[idx].CalledOnNullInput {
@@ -1336,6 +1393,17 @@ func (expr *FuncExpr) TypeCheck(
 		if def.Overloads[idx].Type == UDFRoutine {
 			hasUDFOverload = true
 		}
+		if def.Overloads[idx].Class == AggregateClass {
+			hasAggregate = true
+		}
+		if def.Overloads[idx].Class == GeneratorClass {
+			hasGenerator = true
+		}
+		if def.Overloads[idx].Class == WindowClass {
+			hasWindow = true
+			if hasWindow {
+			}
+		}
 	}
 
 	// If the function is an aggregate that does not accept null arguments and we
@@ -1344,39 +1412,32 @@ func (expr *FuncExpr) TypeCheck(
 	// chooses the overload with preferred type for the given category. For
 	// example, float8 is the preferred type for the numeric category in Postgres.
 	// To match Postgres' behavior, we should add that logic here too.
-	funcCls, err := def.GetClass()
-	if err != nil {
-		return nil, err
-	}
-	if funcCls == AggregateClass {
-		for i := range s.typedExprs {
-			if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
-				var filtered intsets.Fast
-				for j, ok := notCalledOnNullInputFns.Next(0); ok; j, ok = notCalledOnNullInputFns.Next(j + 1) {
-					if def.Overloads[j].params().GetAt(i).Equivalent(types.String) {
-						filtered.Add(j)
-					}
-				}
-
-				// Only use the filtered list if it's not empty.
-				if filtered.Len() > 0 {
-					notCalledOnNullInputFns = filtered
-
-					// Cast the expression to a string so the execution engine will find
-					// the correct overload.
-					s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String)
+	for i := range s.typedExprs {
+		if s.typedExprs[i].ResolvedType().Family() == types.UnknownFamily {
+			var filtered intsets.Fast
+			for j, ok := notCalledOnNullInputFns.Next(0); ok; j, ok = notCalledOnNullInputFns.Next(j + 1) {
+				if def.Overloads[j].Class == AggregateClass && def.Overloads[j].params().GetAt(i).Equivalent(types.String) {
+					filtered.Add(j)
 				}
 			}
-		}
-		truncated := s.overloadIdxs[:0]
-		for _, idx := range s.overloadIdxs {
-			if calledOnNullInputFns.Contains(int(idx)) ||
-				notCalledOnNullInputFns.Contains(int(idx)) {
-				truncated = append(truncated, idx)
+
+			// Only use the filtered list if it's not empty.
+			if filtered.Len() > 0 {
+				notCalledOnNullInputFns = filtered
+				// Cast the expression to a string so the execution engine will find
+				// the correct overload.
+				s.typedExprs[i] = NewTypedCastExpr(s.typedExprs[i], types.String)
 			}
 		}
-		s.overloadIdxs = truncated
 	}
+	truncated := s.overloadIdxs[:0]
+	for _, idx := range s.overloadIdxs {
+		if calledOnNullInputFns.Contains(int(idx)) ||
+			notCalledOnNullInputFns.Contains(int(idx)) {
+			truncated = append(truncated, idx)
+		}
+	}
+	s.overloadIdxs = truncated
 
 	if len(s.overloadIdxs) == 0 {
 		if expr.InCall {
@@ -1399,9 +1460,9 @@ func (expr *FuncExpr) TypeCheck(
 	// within a CALL statement because procedures are always called on NULL
 	// input, and because optbuilder requires a FuncExpr to remain after
 	// type-checking.
-	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 && funcCls != GeneratorClass &&
-		funcCls != AggregateClass && !hasUDFOverload &&
-		semaCtx != nil && !expr.InCall {
+	if len(s.overloadIdxs) > 0 && calledOnNullInputFns.Len() == 0 &&
+		!hasAggregate && !hasGenerator &&
+		!hasUDFOverload && semaCtx != nil && !expr.InCall {
 		for _, expr := range s.typedExprs {
 			if expr.ResolvedType().Family() == types.UnknownFamily {
 				return DNull, nil
@@ -1476,14 +1537,14 @@ func (expr *FuncExpr) TypeCheck(
 		}
 	} else {
 		// Make sure the window function builtins are used as window function applications.
-		if !expr.InCall && funcCls == WindowClass {
+		if !expr.InCall && overloadImpl.Class == WindowClass {
 			return nil, pgerror.Newf(pgcode.WrongObjectType,
 				"window function %s() requires an OVER clause", &expr.Func)
 		}
 	}
 
 	if expr.Filter != nil {
-		if funcCls != AggregateClass {
+		if overloadImpl.Class != AggregateClass {
 			// Same error message as Postgres. If we have a window function, only
 			// aggregates accept a FILTER clause.
 			return nil, pgerror.Newf(pgcode.WrongObjectType,
@@ -1543,6 +1604,12 @@ func (expr *FuncExpr) TypeCheck(
 	if overloadImpl.OnTypeCheck != nil {
 		overloadImpl.OnTypeCheck()
 	}
+
+	if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+		return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
+			"%s()", def.Name)
+	}
+
 	return expr, nil
 }
 

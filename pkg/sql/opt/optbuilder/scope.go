@@ -1112,11 +1112,70 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			panic(err)
 		}
 
+		test1 := func() bool {
+
+			defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
+			s.builder.semaCtx.Properties.Require("TEST1 CONTEXT", 0)
+
+			t, def = s.replaceCount(t, def)
+
+			expr = t.Walk(s)
+
+			t = expr.(*tree.FuncExpr)
+
+			fCopy := *t
+			if orderedSetDef, found := isOrderedSetAggregate(def); found {
+				fmt.Printf(">>> OrderedSetAggregate %q %q \n", def.Name, expr)
+
+				if t.AggType != tree.OrderedSetAgg || len(t.OrderBy) != 1 {
+					panic(pgerror.Newf(
+						pgcode.InvalidFunctionDefinition,
+						"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
+				}
+				def = orderedSetDef
+				fCopy.Func.FunctionReference = orderedSetDef
+				oldExprs := t.Exprs
+				fCopy.Exprs = make(tree.Exprs, len(oldExprs))
+				copy(fCopy.Exprs, oldExprs)
+				fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
+				t = &fCopy
+			}
+
+			expr, err := tree.TypeCheck(s.builder.ctx, t, s.builder.semaCtx, types.Any)
+			if err != nil {
+				fmt.Printf(">>> test TypeCheck err %q \n", err)
+				// panic(errors.Wrap(err, "test1"))
+				panic(err)
+
+			}
+			var ok bool
+			t, ok = expr.(*tree.FuncExpr)
+			return ok
+		}
+
+		class, err := def.GetClass()
+		if err != nil {
+			panic(err)
+		}
+
+		// if normal or generatore , break
+		if class == tree.NormalClass {
+			break
+		}
+		if class == tree.GeneratorClass && s.replaceSRFs == false {
+			break
+		}
+
+		if !test1() {
+			fmt.Printf(">>> NOT44 FuncExpr %q \n", expr)
+			panic("NOT44 FuncExpr")
+			// break
+		}
+
 		if isGenerator(def) && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
 			break
 		}
-
 		if isAggregate(def) && t.WindowDef == nil {
 			expr = s.replaceAggregate(t, def)
 			break
@@ -1264,43 +1323,15 @@ func isOrderedSetAggregate(
 // aggregate references no variables). The aggOutScope.groupby.aggs slice is
 // used later by the Builder to build aggregations in the aggregation scope.
 func (s *scope) replaceAggregate(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
 
-	// We need to save and restore the previous value of the field in
-	// semaCtx in case we are recursively called within a subquery
-	// context.
 	defer s.builder.semaCtx.Properties.Restore(s.builder.semaCtx.Properties)
 
 	s.builder.semaCtx.Properties.Require("aggregate",
 		tree.RejectNestedAggregates|tree.RejectWindowApplications|tree.RejectGenerators)
 
-	// Make a copy of f so we can modify it if needed.
-	fCopy := *f
-	// Override ordered-set aggregates to use their impl counterparts.
-	if orderedSetDef, found := isOrderedSetAggregate(def); found {
-		// Ensure that the aggregation is well formed.
-		if f.AggType != tree.OrderedSetAgg || len(f.OrderBy) != 1 {
-			panic(pgerror.Newf(
-				pgcode.InvalidFunctionDefinition,
-				"ordered-set aggregations must have a WITHIN GROUP clause containing one ORDER BY column"))
-		}
-
-		// Override function definition.
-		def = orderedSetDef
-		fCopy.Func.FunctionReference = orderedSetDef
-
-		// Copy Exprs slice.
-		oldExprs := f.Exprs
-		fCopy.Exprs = make(tree.Exprs, len(oldExprs))
-		copy(fCopy.Exprs, oldExprs)
-
-		// Add implicit column to the input expressions.
-		fCopy.Exprs = append(fCopy.Exprs, s.resolveType(fCopy.OrderBy[0].Expr, types.AnyElement))
-	}
-
-	expr := fCopy.Walk(s)
-
-	// Update this scope to indicate that we are now inside an aggregate function
+	expr := f.Walk(s)
+	
+		// Update this scope to indicate that we are now inside an aggregate function
 	// so that any nested aggregates referencing this scope from a subquery will
 	// return an appropriate error. The returned tempScope will be used for
 	// building aggregate function arguments below in buildAggregateFunction.
@@ -1372,7 +1403,6 @@ func (s *scope) constructWindowDef(def tree.WindowDef) tree.WindowDef {
 }
 
 func (s *scope) replaceWindowFn(f *tree.FuncExpr, def *tree.ResolvedFunctionDefinition) tree.Expr {
-	f, def = s.replaceCount(f, def)
 
 	if err := tree.CheckIsWindowOrAgg(def); err != nil {
 		panic(err)
