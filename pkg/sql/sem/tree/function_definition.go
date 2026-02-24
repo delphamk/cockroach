@@ -519,18 +519,18 @@ func combineOverloads(a, b []QualifiedOverload, path SearchPath) []QualifiedOver
 // TODO(chengxiong,mgartner): make sure that, at places of the use cases of this
 // method, function is resolved to one overload, so that we can get rid of this
 // function and similar methods below.
-func (fd *ResolvedFunctionDefinition) GetClass() (FunctionClass, error) {
-	if fd.UnsupportedWithIssue != 0 {
-		return 0, fd.MakeUnsupportedError()
-	}
-	ret := fd.Overloads[0].Class
-	for i := range fd.Overloads {
-		if fd.Overloads[i].Class != ret {
-			return 0, pgerror.Newf(pgcode.AmbiguousFunction, "ambiguous function class on %s", fd.Name)
-		}
-	}
-	return ret, nil
-}
+// func (fd *ResolvedFunctionDefinition) GetClass() (FunctionClass, error) {
+// 	if fd.UnsupportedWithIssue != 0 {
+// 		return 0, fd.MakeUnsupportedError()
+// 	}
+// 	ret := fd.Overloads[0].Class
+// 	for i := range fd.Overloads {
+// 		if fd.Overloads[i].Class != ret {
+// 			return 0, pgerror.Newf(pgcode.AmbiguousFunction, "ambiguous function class on %s", fd.Name)
+// 		}
+// 	}
+// 	return ret, nil
+// }
 
 // GetReturnLabel returns function ReturnLabel by checking each overload and
 // returns a ReturnLabel if all overloads have a ReturnLabel of the same length.

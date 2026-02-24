@@ -196,6 +196,11 @@ SELECT * FROM t
 statement ok
 CREATE FUNCTION t_update(a STRING, b STRING) RETURNS VOID LANGUAGE SQL AS ''
 
+query I
+SELECT t_update('122', '22');
+----
+NULL
+
 # The procedure t_update and the function t_update can be disambiguated via the
 # argument types.
 statement ok
@@ -210,11 +215,18 @@ statement ok
 DROP FUNCTION t_update(STRING, STRING);
 CREATE FUNCTION t_update(a STRING, b STRING) RETURNS SETOF INT LANGUAGE SQL AS 'SELECT 1'
 
-# TODO(mgartner): This should not be an error. It is due to a limitation in
-# several places that require the function class to be known before the function
-# has been resolved to a specific overload.
-statement error ambiguous function class on t_update
+statement ok
 CALL t_update(1, 0)
+
+query II
+SELECT * FROM t
+----
+1  0
+
+query I
+SELECT t_update('122', '22');
+----
+1
 
 subtest anonymous_args
 

@@ -1150,16 +1150,11 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			return ok
 		}
 
-		class, err := def.GetClass()
-		if err != nil {
-			break
-		}
-
 		// if normal or generatore , break
-		if class == tree.NormalClass {
+		if HasClass(def, tree.NormalClass) {
 			break
 		}
-		if class == tree.GeneratorClass && s.replaceSRFs == false {
+		if HasClass(def, tree.GeneratorClass) && s.replaceSRFs == false {
 			break
 		}
 

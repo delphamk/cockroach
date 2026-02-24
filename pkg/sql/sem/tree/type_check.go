@@ -1095,62 +1095,6 @@ func NewInvalidFunctionUsageError(class FunctionClass, context string) error {
 
 // checkFunctionUsage checks whether a given built-in function is
 // allowed in the current context.
-func (sc *SemaContext) checkFunctionUsage(expr *FuncExpr, def *ResolvedFunctionDefinition) error {
-	if sc == nil {
-		// We can't check anything further. Give up.
-		return nil
-	}
-
-	// TODO(Chengxiong): Consider doing this check when we narrow down to an
-	// overload. This is fine at the moment since we don't allow creating
-	// aggregate/window functions yet. But, ideally, we should figure out a way
-	// to do this check after overload resolution.
-	fnCls, err := def.GetClass()
-	if err != nil {
-		return err
-	}
-	if expr.IsWindowFunctionApplication() {
-		if sc.Properties.IsSet(RejectWindowApplications) {
-			return NewInvalidFunctionUsageError(WindowClass, sc.Properties.required.context)
-		}
-
-		if sc.Properties.Ancestors.Has(WindowFuncAncestor) &&
-			sc.Properties.IsSet(RejectNestedWindowFunctions) {
-			return pgerror.Newf(pgcode.Windowing, "window function calls cannot be nested")
-		}
-		sc.Properties.Derived.SeenWindowApplication = true
-	} else {
-		// If it is an aggregate function *not used OVER a window*, then
-		// we have an aggregation.
-		if fnCls == AggregateClass {
-			if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
-				sc.Properties.IsSet(RejectNestedAggregates) {
-				return NewAggInAggError()
-			}
-			if sc.Properties.IsSet(RejectAggregates) {
-				return NewInvalidFunctionUsageError(AggregateClass, sc.Properties.required.context)
-			}
-			sc.Properties.Derived.SeenAggregate = true
-		}
-	}
-	if fnCls == GeneratorClass {
-		if sc.Properties.Ancestors.Has(FuncExprAncestor) &&
-			sc.Properties.IsSet(RejectNestedGenerators) {
-			return NewInvalidNestedSRFError(sc.Properties.required.context)
-		}
-		if sc.Properties.IsSet(RejectGenerators) {
-			return NewInvalidFunctionUsageError(GeneratorClass, sc.Properties.required.context)
-		}
-		if sc.Properties.Ancestors.Has(ConditionalAncestor) {
-			return NewInvalidFunctionUsageError(GeneratorClass, "conditional expressions")
-		}
-		sc.Properties.Derived.SeenGenerator = true
-	}
-	return nil
-}
-
-// checkFunctionUsage checks whether a given built-in function is
-// allowed in the current context.
 func (sc *SemaContext) CheckFunctionClass(name string, fnCls FunctionClass) error {
 	err := sc.checkFunctionClass(fnCls)
 	if err != nil {
@@ -1248,14 +1192,23 @@ func (sc *SemaContext) checkVolatility(v volatility.V) error {
 
 // CheckIsWindowOrAgg returns an error if the function definition is not a
 // window function or an aggregate.
-func CheckIsWindowOrAgg(def *ResolvedFunctionDefinition) error {
-	cls, err := def.GetClass()
-	if err != nil {
-		return err
+
+func HasClass(def *ResolvedFunctionDefinition, want FunctionClass) bool {
+	if def.UnsupportedWithIssue != 0 {
+		panic(def.MakeUnsupportedError())
 	}
-	switch cls {
-	case AggregateClass:
-	case WindowClass:
+	for i := range def.Overloads {
+		if def.Overloads[i].Class == want {
+			return true
+		}
+	}
+	return false
+}
+
+func CheckIsWindowOrAgg(def *ResolvedFunctionDefinition) error {
+	switch {
+	case HasClass(def, AggregateClass):
+	case HasClass(def, WindowClass):
 	default:
 		return pgerror.Newf(pgcode.WrongObjectType,
 			"OVER specified, but %s() is neither a window function nor an aggregate function",
@@ -1605,7 +1558,11 @@ func (expr *FuncExpr) TypeCheck(
 		overloadImpl.OnTypeCheck()
 	}
 
-	if err := semaCtx.checkFunctionUsage(expr, def); err != nil {
+	cls := overloadImpl.Class
+	if expr.WindowDef != nil {
+		cls = WindowClass
+	}
+	if err := semaCtx.checkFunctionClass(cls); err != nil {
 		return nil, pgerror.Wrapf(err, pgcode.InvalidParameterValue,
 			"%s()", def.Name)
 	}
