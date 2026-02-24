@@ -24,6 +24,8 @@ func TestLineStringFromMultiPoint(t *testing.T) {
 	}{
 		{"MULTIPOINT EMPTY", "LINESTRING EMPTY"},
 		{"MULTIPOINT (1 2, 3 4, 5 6)", "LINESTRING (1 2, 3 4, 5 6)"},
+		{"MULTIPOINT (1 1, 2 2)", "LINESTRING (1 1, 2 2)"},
+		{"MULTIPOINT (1 1 1, 2 2 2)", "LINESTRING Z (1 1 1, 2 2 2)"},
 		{"MULTIPOINT (1 2, EMPTY, 3 4)", "LINESTRING (1 2, 1 2, 3 4)"},
 		{"MULTIPOINT (EMPTY, 1 2, EMPTY, 3 4)", "LINESTRING (0 0, 1 2, 1 2, 3 4)"},
 		{"MULTIPOINT (EMPTY, EMPTY, 1 2, EMPTY, 3 4)", "LINESTRING (0 0, 0 0, 1 2, 1 2, 3 4)"},
@@ -65,6 +67,158 @@ func TestLineStringFromMultiPoint(t *testing.T) {
 
 				_, err = LineStringFromMultiPoint(g)
 				require.Error(t, err)
+			})
+		}
+	})
+}
+
+func TestMakeLine(t *testing.T) {
+
+	testCases := []struct {
+		wkt1     string
+		wkt2     string
+		expected string
+	}{
+		{"POINT (1 2)", "POINT (3 4)", "LINESTRING (1 2, 3 4)"},
+		{"LINESTRING (1 2, 3 4)", "POINT (5 5)", "LINESTRING (1 2, 3 4, 5 5)"},
+		{"POINT (1 2 1)", "POINT (3 4 2)", "LINESTRING Z (1 2 1, 3 4 2)"},
+
+		{"POINT EMPTY", "LINESTRING (1 1, 2 2)", "LINESTRING (1 1, 2 2)"},
+		{"POINT EMPTY", "POINT EMPTY", "LINESTRING EMPTY"},
+
+		// force 2d point to 3d
+		{"POINT (1 1)", "POINT (2 2 2)", "LINESTRING Z (1 1 0, 2 2 2)"},
+		{"POINT (1 1)", "LINESTRING Z(2 2 2, 3 3 3)", "LINESTRING Z (1 1 0, 2 2 2, 3 3 3)"},
+		{"MULTIPOINT (1 1, 2 2)", "LINESTRING (1 2 1, 3 4 2)", "LINESTRING Z (1 1 0, 2 2 0, 1 2 1, 3 4 2)"},
+
+		// remove duplicate line start
+		{"LINESTRING (1 1, 3 4)", "LINESTRING (3 4, 2 2)", "LINESTRING (1 1, 3 4, 2 2)"},
+		{"POINT (1 1)", "LINESTRING (1 1, 2 2)", "LINESTRING (1 1, 2 2)"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+			srid := geopb.SRID(4000)
+			g1, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt1), srid, true)
+			require.NoError(t, err)
+			g2, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt2), srid, true)
+			require.NoError(t, err)
+
+			result, err := MakeLine(g1, g2)
+			require.NoError(t, err)
+
+			wkt, err := geo.SpatialObjectToWKT(result.SpatialObject(), 0)
+
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expected, wkt)
+			require.EqualValues(t, srid, result.SRID())
+		})
+	}
+
+	errorTestCases := []struct {
+		wkt1 string
+		wkt2 string
+	}{
+		// 2d line + 3d line
+		{"LINESTRING (1 1, 2 2)", "LINESTRING (1 1 1, 2 2 2)"},
+	}
+
+	t.Run("Errors on invalid input", func(t *testing.T) {
+		for i, tc := range errorTestCases {
+			t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+				srid := geopb.SRID(4000)
+
+				g1, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt1), srid, true)
+				require.NoError(t, err)
+
+				g2, err := geo.ParseGeometryFromEWKT(geopb.EWKT(tc.wkt2), srid, true)
+				require.NoError(t, err)
+
+				_, err = MakeLine(g1, g2)
+				require.Error(t, err)
+
+			})
+		}
+	})
+}
+
+func TestMakeLineArray(t *testing.T) {
+
+	testCases := []struct {
+		wkt      []string
+		expected string
+	}{
+		{[]string{"POINT (1 2)", "POINT (3 4)"}, "LINESTRING (1 2, 3 4)"},
+		{[]string{"POINT (1 1)", "POINT (3 3)", "POINT (1 3)"}, "LINESTRING (1 1, 3 3, 1 3)"},
+
+		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
+
+		// force points to 3D
+		{[]string{"POINT (1 1)", "POINT (3 3)", "POINT (1 3 3)"}, "LINESTRING Z (1 1 0, 3 3 0, 1 3 3)"},
+		{[]string{"POINT (1 1)", "POINT (3 2)", "LINESTRING Z(4 3 4, 3 2 3)"}, "LINESTRING Z (1 1 0, 3 2 0, 4 3 4, 3 2 3)"},
+
+		// remove duplicate start point
+		{[]string{"POINT (4 3 4)", "LINESTRING Z(4 3 4, 3 2 3)"}, "LINESTRING Z (4 3 4, 3 2 3)"},
+		{[]string{"LINESTRING Z(1 3 1, 4 3 4)", "LINESTRING Z(4 3 4, 3 2 3)"}, "LINESTRING Z (1 3 1, 4 3 4, 3 2 3)"},
+
+		// ignore geomtries that are not POINT, MULTIPOINT, or LINESTRING
+		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "MULTILINESTRING((0 0,1 1),(2 2,3 3),(4 4,5 5))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
+		{[]string{"MULTIPOINT(2 2, 3 3, 4 4)", "LINESTRING(1 1, 4 4)", "POLYGON((3 3, 4 4, 2 2, 3 3))"}, "LINESTRING (2 2, 3 3, 4 4, 1 1, 4 4)"},
+
+		// null test
+		{[]string{}, "LINESTRING EMPTY"},
+		{[]string{"LINESTRING EMPTY"}, "LINESTRING EMPTY"},
+		{[]string{"POINT (1 1)", "LINESTRING EMPTY", "POINT (3 2)"}, "LINESTRING (1 1, 3 2)"},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+			srid := geopb.SRID(4000)
+
+			geos := []geo.Geometry{}
+
+			for _, wkt := range tc.wkt {
+				g, err := geo.ParseGeometryFromEWKT(geopb.EWKT(wkt), srid, true)
+				require.NoError(t, err)
+				geos = append(geos, g)
+			}
+
+			result, err := MakeLineArray(geos)
+			require.NoError(t, err)
+
+			wkt, err := geo.SpatialObjectToWKT(result.SpatialObject(), 0)
+
+			require.NoError(t, err)
+			require.EqualValues(t, tc.expected, wkt)
+			if !result.Empty() {
+				require.EqualValues(t, srid, result.SRID())
+			}
+		})
+	}
+
+	errorTestCases := []struct {
+		wkt []string
+	}{
+		// 2d line + 3d line
+		{[]string{"LINESTRING (1 1, 2 2)", "LINESTRING (1 1 1, 2 2 2)"}},
+	}
+
+	t.Run("Errors on invalid input", func(t *testing.T) {
+		for i, tc := range errorTestCases {
+			t.Run(fmt.Sprintf("test: %v", i), func(t *testing.T) {
+				srid := geopb.SRID(4000)
+
+				geos := []geo.Geometry{}
+
+				for _, wkt := range tc.wkt {
+					g, err := geo.ParseGeometryFromEWKT(geopb.EWKT(wkt), srid, true)
+					require.NoError(t, err)
+					geos = append(geos, g)
+				}
+
+				_, err := MakeLineArray(geos)
+				require.Error(t, err)
+
 			})
 		}
 	})

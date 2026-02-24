@@ -1150,10 +1150,10 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			return ok
 		}
 
-		// if normal or generatore , break
-		if HasClass(def, tree.NormalClass) {
-			break
-		}
+		// if HasClass(def, tree.NormalClass) {
+		// 	break
+		// }
+
 		if HasClass(def, tree.GeneratorClass) && s.replaceSRFs == false {
 			break
 		}
@@ -1162,11 +1162,12 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			break
 		}
 
-		if isGenerator(def) && s.replaceSRFs {
+		if t.ResolvedOverload().Class == tree.GeneratorClass && s.replaceSRFs {
 			expr = s.replaceSRF(t, def)
 			break
 		}
-		if isAggregate(def) && t.WindowDef == nil {
+
+		if t.ResolvedOverload().Class == tree.AggregateClass && t.WindowDef == nil {
 			expr = s.replaceAggregate(t, def)
 			break
 		}
@@ -1176,7 +1177,7 @@ func (s *scope) VisitPre(expr tree.Expr) (recurse bool, newExpr tree.Expr) {
 			break
 		}
 
-		if isSQLFn(def) {
+		if t.ResolvedOverload().Class == tree.SQLClass {
 			expr = s.replaceSQLFn(t, def)
 			break
 		}

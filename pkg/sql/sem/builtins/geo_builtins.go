@@ -487,6 +487,61 @@ func (s *subdividedGeometriesGen) Next(_ context.Context) (bool, error) {
 	return s.curr < len(s.geometries), nil
 }
 
+var makeLineBuiltin builtinDefinition = makeBuiltin(
+	defProps(),
+	makelineAggregate,
+	makeline2,
+)
+
+var makelineAggregate tree.Overload = makeAggOverload( // st_makeline(arg1: geometry) -> geometry
+	[]*types.T{types.Geometry},
+	types.Geometry,
+	func(params []*types.T, evalCtx *eval.Context, arguments tree.Datums) eval.AggregateFunc {
+		return &stMakeLineAgg{acc: evalCtx.Planner.Mon().MakeBoundAccount()}
+	},
+	infoBuilder{info: "Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored."}.String(),
+	volatility.Immutable,
+	true, /* calledOnNullInput */
+)
+
+var makeline2 tree.Overload = geometryOverload2( // st_makeline(geometry_a: geometry, geometry_b: geometry) -> geometry
+	func(_ context.Context, _ *eval.Context, a *tree.DGeometry, b *tree.DGeometry) (tree.Datum, error) {
+		line, err := geomfn.MakeLine(a.Geometry, b.Geometry)
+		return &tree.DGeometry{Geometry: line}, err
+	},
+	types.Geometry,
+	infoBuilder{
+		info: "Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored.",
+	},
+	volatility.Immutable,
+)
+var makelineArray tree.Overload = tree.Overload{
+	Types: tree.ParamTypes{
+		{Name: "geos", Typ: types.AnyArray},
+	},
+	ReturnType: tree.FixedReturnType(types.Geometry),
+	Fn: func(_ context.Context, _ *eval.Context, args tree.Datums) (tree.Datum, error) {
+		panic("MAKE_LINE_ARRAY")
+		// geosArr := tree.MustBeDArray(args[0])
+		// geos := make([]geo.Geometry, len(geosArr.Array))
+		// for i, v := range geosArr.Array {
+		// 	g, ok := v.(*tree.DGeometry)
+		// 	if !ok {
+		// 		return nil, errors.Newf("argument must be LINESTRING geometries")
+		// 	}
+		// 	geos[i] = g.Geometry
+		// }
+		// line, err := geomfn.MakeLineArray(geos)
+		// return &tree.DGeometry{Geometry: line}, err
+		// return nil, nil
+
+	},
+	Info: infoBuilder{
+		info: `Forms a LineString from Point, MultiPoint or LineStrings. Other shapes will be ignored.`,
+	}.String(),
+	Volatility: volatility.Immutable,
+}
+
 var geoBuiltins = map[string]builtinDefinition{
 	//
 	// Meta builtins.
@@ -7282,7 +7337,7 @@ Can be used to define the tile bounds required by ST_AsMVTGeom to convert geomet
 			CalledOnNullInput: true,
 		},
 	),
-
+	"st_makeline": makeLineBuiltin,
 	//
 	// Unimplemented.
 	//

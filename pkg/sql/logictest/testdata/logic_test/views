@@ -1951,3 +1951,51 @@ show session allow_view_with_security_invoker_clause;
 on
 
 subtest end
+
+
+statement ok
+CREATE TABLE geo_table (
+    a geometry
+);
+
+statement ok
+INSERT INTO geo_table (a) VALUES (ST_Point(1, 2));
+INSERT INTO geo_table (a) VALUES (ST_Point(3, 4));
+
+query T colnames,rowsort
+SELECT ST_AsText( ST_MakeLine(a) ) from geo_table;
+----
+st_astext
+LINESTRING (1 2, 3 4)
+
+
+query T colnames,rowsort
+SELECT ST_AsText( ST_MakeLine(ST_Point(1, 2),ST_Point(3, 4)));
+----
+st_astext
+LINESTRING (1 2, 3 4)
+
+
+query T colnames,rowsort
+SELECT ST_AsText( ST_MakeLine(ST_Point(0, 0), a)) from geo_table;
+----
+st_astext
+LINESTRING (0 0, 1 2)
+LINESTRING (0 0, 3 4)
+
+
+
+query T colnames,rowsort
+SELECT ST_AsText( ST_MakeLine(ST_MakeLine(ST_Point(1, 2),ST_Point(3, 4)), a)) from geo_table;
+----
+st_astext
+LINESTRING (1 2, 3 4, 1 2)
+LINESTRING (1 2, 3 4, 3 4)
+
+
+
+query T colnames,rowsort
+SELECT ST_AsText( ST_MakeLine(ST_Point(0, 0), ST_MakeLine(a))) from geo_table;
+----
+st_astext
+LINESTRING (0 0, 1 2, 3 4)
