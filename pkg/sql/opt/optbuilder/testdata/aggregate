@@ -1,5 +1,43 @@
 # tests adapted from logictest -- aggregate
 
+
+build
+SELECT min((CASE WHEN true THEN NULL:::FLOAT END));
+----
+scalar-group-by
+ ├── columns: min:2
+ ├── project
+ │    ├── columns: column1:1
+ │    ├── values
+ │    │    └── ()
+ │    └── projections
+ │         └── CASE WHEN true THEN NULL::FLOAT8 ELSE CAST(NULL AS FLOAT8) END [as=column1:1]
+ └── aggregations
+      └── min [as=min:2]
+           └── column1:1
+
+
+build
+SELECT min((CASE WHEN true THEN NULL:::FLOAT END)) IS NOT NAN;
+----
+project
+ ├── columns: "?column?":3
+ ├── scalar-group-by
+ │    ├── columns: min:2
+ │    ├── project
+ │    │    ├── columns: column1:1
+ │    │    ├── values
+ │    │    │    └── ()
+ │    │    └── projections
+ │    │         └── CASE WHEN true THEN NULL::FLOAT8 ELSE CAST(NULL AS FLOAT8) END [as=column1:1]
+ │    └── aggregations
+ │         └── min [as=min:2]
+ │              └── column1:1
+ └── projections
+      └── min:2 != NaN [as="?column?":3]
+
+
+
 exec-ddl
 CREATE TABLE kv (
   k INT PRIMARY KEY,

@@ -117,6 +117,15 @@ func (b *Builder) buildScalar(
 	case *windowInfo:
 		return b.finishBuildScalarRef(t.col, inScope, outScope, outCol, colRefs)
 
+	case *tree.AnnotateTypeExpr:
+		texpr := t.TypedInnerExpr()
+		if texpr == tree.DNull {
+			arg := b.buildScalar(texpr, inScope, nil, nil, colRefs)
+			out = b.factory.ConstructCast(arg, t.ResolvedType())
+		} else {
+			return b.buildScalar(t.TypedInnerExpr(), inScope, outScope, outCol, colRefs)
+		}
+
 	case *tree.AndExpr:
 		left := b.buildScalar(reType(t.TypedLeft(), types.Bool), inScope, nil, nil, colRefs)
 		right := b.buildScalar(reType(t.TypedRight(), types.Bool), inScope, nil, nil, colRefs)

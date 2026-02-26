@@ -800,6 +800,24 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 		return nil, err
 	}
 	expr.Type = annotateType
+	isAlreadyConstant := false
+	// isUnresolved := false
+	// isArray := false
+
+	switch {
+	case isConstant(expr.Expr):
+		c := expr.Expr.(Constant)
+		if canConstantBecome(c, annotateType) {
+
+			isAlreadyConstant = true
+		}
+		// possible edge cases from?
+		// case semaCtx.isUnresolvedPlaceholder(expr.Expr):
+		// 	isUnresolved = true
+		// case isArrayExpr(expr.Expr):
+		// 	isArray = true
+	}
+
 	subExpr, err := typeCheckAndRequire(
 		ctx,
 		semaCtx,
@@ -814,7 +832,21 @@ func (expr *AnnotateTypeExpr) TypeCheck(
 	if err != nil {
 		return nil, err
 	}
-	return subExpr, nil
+
+	funcExprAncestor := semaCtx == nil || semaCtx.Properties.Ancestors.Has(FuncExprAncestor)
+	alreadyDesired := annotateType.Equal(desired)
+
+	force := false
+	// force = true
+
+	if force || !funcExprAncestor || alreadyDesired || isAlreadyConstant {
+		return subExpr, nil
+	}
+
+	expr.Expr = subExpr
+	expr.typ = annotateType
+
+	return expr, nil
 }
 
 // TypeCheck implements the Expr interface.
