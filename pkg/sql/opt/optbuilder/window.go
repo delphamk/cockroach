@@ -39,6 +39,10 @@ func (w *windowInfo) Walk(v tree.Visitor) tree.Expr {
 func (w *windowInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+	err := semaCtx.CheckFunctionClass(w.def.Name, tree.WindowClass)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := w.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}

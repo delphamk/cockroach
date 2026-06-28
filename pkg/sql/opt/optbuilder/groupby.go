@@ -224,6 +224,10 @@ func (a *aggregateInfo) TypeCheck(
 	if _, err := a.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}
+	err := semaCtx.CheckFunctionClass(a.def.Name, tree.AggregateClass)
+	if err != nil {
+		return nil, err
+	}
 	return a, nil
 }
 
@@ -915,7 +919,7 @@ func (b *Builder) constructAggregate(name string, args []opt.ScalarExpr) opt.Sca
 }
 
 func isAggregate(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.AggregateClass)
+	return HasClass(def, tree.AggregateClass)
 }
 
 // padSTAsMVTArgs pads the argument list for st_asmvt with typed NULL defaults
@@ -937,19 +941,23 @@ func padSTAsMVTArgs(argExprs []tree.TypedExpr) []tree.TypedExpr {
 }
 
 func isGenerator(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.GeneratorClass)
+	return HasClass(def, tree.GeneratorClass)
 }
 
 func isSQLFn(def *tree.ResolvedFunctionDefinition) bool {
-	return isClass(def, tree.SQLClass)
+	return HasClass(def, tree.SQLClass)
 }
 
-func isClass(def *tree.ResolvedFunctionDefinition, want tree.FunctionClass) bool {
-	cls, err := def.GetClass()
-	if err != nil {
-		panic(err)
+func HasClass(def *tree.ResolvedFunctionDefinition, want tree.FunctionClass) bool {
+	if def.UnsupportedWithIssue != 0 {
+		panic(def.MakeUnsupportedError())
 	}
-	return cls == want
+	for i := range def.Overloads {
+		if def.Overloads[i].Class == want {
+			return true
+		}
+	}
+	return false
 }
 
 func newGroupingError(name tree.Name) error {

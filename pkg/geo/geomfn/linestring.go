@@ -49,6 +49,138 @@ func LineStringFromMultiPoint(g geo.Geometry) (geo.Geometry, error) {
 	return geo.MakeGeometryFromGeomT(lineString)
 }
 
+func MakeLine(a geo.Geometry, b geo.Geometry) (geo.Geometry, error) {
+	// verify linetype or point type
+	// verify match srid
+	aGeomT, err := a.AsGeomT()
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+	bGeomT, err := b.AsGeomT()
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+
+	switch aGeomT.(type) {
+	case *geom.Point, *geom.MultiPoint, *geom.LineString, *geom.MultiLineString:
+	default:
+		return geo.Geometry{}, errors.New("invalid type")
+	}
+	switch bGeomT.(type) {
+	case *geom.Point, *geom.MultiPoint, *geom.LineString, *geom.MultiLineString:
+	default:
+		return geo.Geometry{}, errors.New("invalid type")
+	}
+	// pgerror.Newf(pgcode.InvalidParameterValue, "object type %s does not match column dimensionality %s", so.ShapeType, shapeType)
+
+	if aGeomT.SRID() != bGeomT.SRID() {
+		return geo.Geometry{}, errors.New("SRID mismatch")
+	}
+
+	lineString, err := MakeLineFromGeomTArray(aGeomT.SRID(), []geom.T{aGeomT, bGeomT})
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+	return geo.MakeGeometryFromGeomT(lineString)
+}
+
+func MakeLineArray(geos []geo.Geometry) (geo.Geometry, error) {
+	// verify >1 element
+	// create geos list. ignore invalid types
+	// first valid, get the srid. if srid does not mactch error.
+
+	if len(geos) == 0 {
+		return geo.MakeGeometryFromGeomT(geom.NewLineString(geom.XY))
+	}
+
+	geoms := []geom.T{}
+	var srid int
+
+	for _, g := range geos {
+		geomT, err := g.AsGeomT()
+		if err != nil {
+			return geo.Geometry{}, err
+		}
+
+		switch geomT.(type) {
+		case *geom.Point, *geom.MultiPoint, *geom.LineString:
+		default:
+			continue
+		}
+
+		geoms = append(geoms, geomT)
+		if len(geoms) == 1 {
+			srid = geomT.SRID()
+		} else if srid != geomT.SRID() {
+			return geo.Geometry{}, errors.New("SRID mismatch")
+		}
+	}
+
+	if len(geoms) == 0 {
+		// TODO add log for unused geoms. "No points or linestrings in input array"
+		return geo.MakeGeometryFromGeomT(geom.NewLineString(geom.XY))
+	}
+	lineString, err := MakeLineFromGeomTArray(srid, geoms)
+	if err != nil {
+		return geo.Geometry{}, err
+	}
+	return geo.MakeGeometryFromGeomT(lineString)
+}
+
+func MakeLineFromGeomTArray(srid int, geoms []geom.T) (geom.T, error) {
+	// check for Z and M
+	// create points array with dimension
+	// add points to array. depending on type, maybe skip.. other errors
+
+	layout := geom.NoLayout
+
+	for _, t := range geoms {
+		if t.Layout() > layout {
+			layout = t.Layout()
+		}
+	}
+
+	flatCoords := make([]float64, 0, len(geoms)*layout.Stride())
+
+	for _, t := range geoms {
+		if t.Empty() {
+			continue
+		}
+		switch t := t.(type) {
+		case *geom.Point:
+			if t.Layout() == layout {
+				flatCoords = append(flatCoords, t.FlatCoords()...)
+			} else {
+				flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			}
+		case *geom.MultiPoint:
+			if t.Layout() == layout {
+				flatCoords = append(flatCoords, t.FlatCoords()...)
+			} else {
+				flatCoords = append(flatCoords, forceFlatCoordsLayout(t, layout, 0, 0)...)
+			}
+		case *geom.LineString:
+			if t.Layout() != layout {
+				return nil, errors.New("wrong layout")
+			}
+			lineFlatCoords := t.FlatCoords()
+			// If the end point and start point are the same, then don't copy start point
+			if len(flatCoords) >= layout.Stride() {
+				lastCoord := geom.Coord(flatCoords[len(flatCoords)-layout.Stride():])
+				if lastCoord.Equal(layout, lineFlatCoords[:layout.Stride()]) {
+					lineFlatCoords = lineFlatCoords[layout.Stride():]
+				}
+			}
+			flatCoords = append(flatCoords, lineFlatCoords...)
+		default:
+			continue
+		}
+	}
+	lineString := geom.NewLineStringFlat(layout, flatCoords).SetSRID(srid)
+	return lineString, nil
+
+}
+
 // LineMerge merges multilinestring constituents.
 func LineMerge(g geo.Geometry) (geo.Geometry, error) {
 	// Mirrors PostGIS behavior
