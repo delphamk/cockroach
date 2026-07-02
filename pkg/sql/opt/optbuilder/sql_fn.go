@@ -37,6 +37,10 @@ func (s *sqlFnInfo) Walk(v tree.Visitor) tree.Expr {
 func (s *sqlFnInfo) TypeCheck(
 	ctx context.Context, semaCtx *tree.SemaContext, desired *types.T,
 ) (tree.TypedExpr, error) {
+	err := semaCtx.CheckFunctionClass(s.def.Name, tree.SQLClass)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := s.FuncExpr.TypeCheck(ctx, semaCtx, desired); err != nil {
 		return nil, err
 	}
